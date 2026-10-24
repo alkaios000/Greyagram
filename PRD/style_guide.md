@@ -1,6 +1,6 @@
 # Layouting
 * workspace
-> tidak ada
+> tidak ada 
 
 # Design
 * tidak ada icon dengan emoticon
