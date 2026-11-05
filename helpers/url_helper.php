@@ -11,7 +11,19 @@ if (!function_exists('base_url')) {
      */
     function base_url(string $path = ''): string
     {
-        $base = rtrim($_ENV['APP_URL'] ?? 'http://localhost/Greyagram', '/');
+        if (!empty($_SERVER['HTTP_HOST'])) {
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
+            $host = $_SERVER['HTTP_HOST'];
+
+            // Dapatkan subfolder direktori script jika ada
+            $scriptDir = dirname($_SERVER['SCRIPT_NAME'] ?? '');
+            $scriptDir = ($scriptDir === '/' || $scriptDir === '\\' || $scriptDir === '.') ? '' : rtrim(str_replace('\\', '/', $scriptDir), '/');
+
+            $base = "{$protocol}://{$host}{$scriptDir}";
+        } else {
+            $base = rtrim($_ENV['APP_URL'] ?? 'http://localhost/Greyagram', '/');
+        }
+
         $path = ltrim($path, '/');
         return $path !== '' ? "{$base}/{$path}" : $base;
     }

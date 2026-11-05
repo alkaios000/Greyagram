@@ -64,6 +64,12 @@ try {
             $controller->index();
             break;
 
+        case 'diagram':
+            require_once __DIR__ . '/controllers/diagram_controller.php';
+            $controller = new DiagramController();
+            $controller->index();
+            break;
+
         default:
             http_response_code(404);
             $page_title = '404 - Halaman Tidak Ditemukan';

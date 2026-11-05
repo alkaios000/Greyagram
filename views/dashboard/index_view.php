@@ -9,8 +9,12 @@ require_once __DIR__ . '/../layouts/sidebar.php';
             <h1 class="page-title">Dashboard</h1>
             <p class="page-subtitle">Selamat datang kembali di panel kerja Greyagram.</p>
         </div>
-        <div class="header-actions">
-            <a href="<?= base_url('users') ?>" class="btn btn-primary">
+        <div class="header-actions" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <a href="<?= base_url('diagram') ?>" class="btn btn-primary">
+                <i class="fa-solid fa-diagram-project"></i>
+                <span>Buka Diagram Workspace</span>
+            </a>
+            <a href="<?= base_url('users') ?>" class="btn btn-outline" style="border: 1px solid var(--border-color); background: #ffffff; color: var(--text-primary);">
                 <i class="fa-solid fa-users"></i>
                 <span>Kelola Pengguna</span>
             </a>

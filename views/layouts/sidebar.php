@@ -30,6 +30,12 @@ $user_role = $_SESSION['user']['role'] ?? 'User';
                 </a>
             </li>
             <li class="nav-item">
+                <a href="<?= base_url('diagram') ?>" class="nav-link <?= str_contains($current_url, 'diagram') ? 'active' : '' ?>">
+                    <i class="fa-solid fa-diagram-project nav-icon"></i>
+                    <span>Diagram Workspace</span>
+                </a>
+            </li>
+            <li class="nav-item">
                 <a href="<?= base_url('users') ?>" class="nav-link <?= str_contains($current_url, 'users') ? 'active' : '' ?>">
                     <i class="fa-solid fa-users nav-icon"></i>
                     <span>Pengguna</span>

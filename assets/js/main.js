@@ -3,8 +3,8 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Auto-dismiss alert setelah 5 detik jika ada
-    const alerts = document.querySelectorAll('.alert');
+    // Auto-dismiss alert flash sementara setelah 5 detik jika ada
+    const alerts = document.querySelectorAll('.alert-dismissible, .alert-flash');
     alerts.forEach(alert => {
         setTimeout(() => {
             alert.style.transition = 'opacity 0.5s ease';
