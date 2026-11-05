@@ -19,7 +19,9 @@ window.DiagramCanvas = (function () {
             panStartY: 0,
             activeDragNodeId: null,
             dragOffset: { x: 0, y: 0 },
-            onUpdate: null
+            onUpdate: null,
+            onPositionChange: null,
+            savedLayoutData: null
         };
 
         // Inisialisasi SVG defs untuk marker panah dan simbol relasi
@@ -31,24 +33,48 @@ window.DiagramCanvas = (function () {
         /**
          * Render diagram lengkap dari model data
          */
-        function render(classes, relations, shouldAutoFit = true) {
+        function render(classes, relations, shouldAutoFit = true, customLayout = null) {
             state.classes = classes || [];
             state.relations = relations || [];
 
-            // Hitung layout bebas tabrakan jika posisi belum ada
+            // Hitung layout bebas tabrakan bawaan
             state.nodePositions = DiagramLayout.computeLayout(state.classes, state.relations);
+
+            // Jika ada posisi tersimpan (customLayout), terapkan koordinat tersimpan
+            const layoutSource = customLayout || state.savedLayoutData;
+            let hasSavedPositions = false;
+
+            if (layoutSource && typeof layoutSource === 'object') {
+                const positionsObj = layoutSource.positions || layoutSource;
+                Object.keys(positionsObj).forEach(id => {
+                    if (state.nodePositions.has(id)) {
+                        const cur = state.nodePositions.get(id);
+                        if (typeof positionsObj[id].x === 'number') cur.x = positionsObj[id].x;
+                        if (typeof positionsObj[id].y === 'number') cur.y = positionsObj[id].y;
+                        hasSavedPositions = true;
+                    }
+                });
+
+                if (hasSavedPositions) {
+                    state.savedLayoutData = layoutSource;
+                    // Jika ada posisi tersimpan, jangan reset ke autofit default kecuali diminta eksplisit
+                    if (shouldAutoFit === 'auto') {
+                        shouldAutoFit = false;
+                    }
+                }
+            }
 
             // Render DOM node cards
             renderNodeElements();
 
             // Ukur dimensi fisik aktual setiap kartu secara sinkron dari DOM
-            measureActualNodeDimensions();
+            measureActualNodeDimensions(!hasSavedPositions);
 
             // Render SVG connectors dengan koordinat dimensi riil
             updateConnectors();
 
             // Lakukan autofit jika diminta
-            if (shouldAutoFit && state.classes.length > 0) {
+            if (shouldAutoFit === true && state.classes.length > 0) {
                 autoFit();
             } else {
                 applyTransform();
@@ -71,7 +97,7 @@ window.DiagramCanvas = (function () {
          * Ukur tinggi dan lebar fisik sebenarnya dari elemen DOM kartu
          * dan pastikan celah/koridor antar baris selalu lapang (anti-tabrakan).
          */
-        function measureActualNodeDimensions() {
+        function measureActualNodeDimensions(shouldEnforceGaps = true) {
             state.classes.forEach(cls => {
                 const card = document.getElementById('node_' + cls.id);
                 if (card) {
@@ -85,7 +111,9 @@ window.DiagramCanvas = (function () {
                 }
             });
 
-            enforceMinimumRowGaps();
+            if (shouldEnforceGaps) {
+                enforceMinimumRowGaps();
+            }
         }
 
         /**
@@ -282,6 +310,256 @@ window.DiagramCanvas = (function () {
         }
 
         /**
+         * Deteksi dan terapkan Smart Snapping & Alignment Guides (Gaya Canva / Figma)
+         * Menyejajarkan sisi kiri, tengah, kanan, atas, tengah-vertikal, dan bawah dengan kartu lain.
+         */
+        function checkSmartSnapping(nodeId, rawX, rawY) {
+            const curPos = state.nodePositions.get(nodeId);
+            if (!curPos) return { x: rawX, y: rawY, guides: [] };
+
+            const w = curPos.width || 260;
+            const h = curPos.height || 160;
+
+            const SNAP_THRESHOLD = 8; // Ambang batas magnetik dalam pixel kanvas
+
+            let snappedX = rawX;
+            let snappedY = rawY;
+
+            let bestDiffX = SNAP_THRESHOLD + 1;
+            let bestDiffY = SNAP_THRESHOLD + 1;
+
+            let activeGuideLines = [];
+
+            // Titik acuan kartu yang sedang digeser
+            const dragBounds = {
+                left: rawX,
+                center: rawX + w / 2,
+                right: rawX + w,
+                top: rawY,
+                middle: rawY + h / 2,
+                bottom: rawY + h
+            };
+
+            // Bandingkan dengan seluruh kartu lain di kanvas
+            state.classes.forEach(otherCls => {
+                if (otherCls.id === nodeId) return;
+                const other = state.nodePositions.get(otherCls.id);
+                if (!other) return;
+
+                const oLeft = other.x;
+                const oCenter = other.x + (other.width || 260) / 2;
+                const oRight = other.x + (other.width || 260);
+                const oTop = other.y;
+                const oMiddle = other.y + (other.height || 160) / 2;
+                const oBottom = other.y + (other.height || 160);
+
+                // --- 1. SNAPPING VERTIKAL (Menyesuaikan Koordinat X) ---
+
+                // Center-to-Center (Warna magenta/pink Canva)
+                const diffCenterX = Math.abs(dragBounds.center - oCenter);
+                if (diffCenterX <= SNAP_THRESHOLD && diffCenterX < bestDiffX) {
+                    bestDiffX = diffCenterX;
+                    snappedX = Math.round(oCenter - w / 2);
+                    activeGuideLines = activeGuideLines.filter(g => g.axis !== 'x');
+                    activeGuideLines.push({
+                        axis: 'x',
+                        coord: oCenter,
+                        y1: Math.min(dragBounds.top, oTop) - 40,
+                        y2: Math.max(dragBounds.bottom, oBottom) + 40,
+                        isCenter: true
+                    });
+                }
+
+                // Left-to-Left
+                const diffLeftLeft = Math.abs(dragBounds.left - oLeft);
+                if (diffLeftLeft <= SNAP_THRESHOLD && diffLeftLeft < bestDiffX) {
+                    bestDiffX = diffLeftLeft;
+                    snappedX = oLeft;
+                    activeGuideLines = activeGuideLines.filter(g => g.axis !== 'x');
+                    activeGuideLines.push({
+                        axis: 'x',
+                        coord: oLeft,
+                        y1: Math.min(dragBounds.top, oTop) - 40,
+                        y2: Math.max(dragBounds.bottom, oBottom) + 40,
+                        isCenter: false
+                    });
+                }
+
+                // Right-to-Right
+                const diffRightRight = Math.abs(dragBounds.right - oRight);
+                if (diffRightRight <= SNAP_THRESHOLD && diffRightRight < bestDiffX) {
+                    bestDiffX = diffRightRight;
+                    snappedX = oRight - w;
+                    activeGuideLines = activeGuideLines.filter(g => g.axis !== 'x');
+                    activeGuideLines.push({
+                        axis: 'x',
+                        coord: oRight,
+                        y1: Math.min(dragBounds.top, oTop) - 40,
+                        y2: Math.max(dragBounds.bottom, oBottom) + 40,
+                        isCenter: false
+                    });
+                }
+
+                // Left-to-Right
+                const diffLeftRight = Math.abs(dragBounds.left - oRight);
+                if (diffLeftRight <= SNAP_THRESHOLD && diffLeftRight < bestDiffX) {
+                    bestDiffX = diffLeftRight;
+                    snappedX = oRight;
+                    activeGuideLines = activeGuideLines.filter(g => g.axis !== 'x');
+                    activeGuideLines.push({
+                        axis: 'x',
+                        coord: oRight,
+                        y1: Math.min(dragBounds.top, oTop) - 40,
+                        y2: Math.max(dragBounds.bottom, oBottom) + 40,
+                        isCenter: false
+                    });
+                }
+
+                // Right-to-Left
+                const diffRightLeft = Math.abs(dragBounds.right - oLeft);
+                if (diffRightLeft <= SNAP_THRESHOLD && diffRightLeft < bestDiffX) {
+                    bestDiffX = diffRightLeft;
+                    snappedX = oLeft - w;
+                    activeGuideLines = activeGuideLines.filter(g => g.axis !== 'x');
+                    activeGuideLines.push({
+                        axis: 'x',
+                        coord: oLeft,
+                        y1: Math.min(dragBounds.top, oTop) - 40,
+                        y2: Math.max(dragBounds.bottom, oBottom) + 40,
+                        isCenter: false
+                    });
+                }
+
+                // --- 2. SNAPPING HORIZONTAL (Menyesuaikan Koordinat Y) ---
+
+                // Middle-to-Middle (Warna magenta/pink Canva)
+                const diffMiddleY = Math.abs(dragBounds.middle - oMiddle);
+                if (diffMiddleY <= SNAP_THRESHOLD && diffMiddleY < bestDiffY) {
+                    bestDiffY = diffMiddleY;
+                    snappedY = Math.round(oMiddle - h / 2);
+                    activeGuideLines = activeGuideLines.filter(g => g.axis !== 'y');
+                    activeGuideLines.push({
+                        axis: 'y',
+                        coord: oMiddle,
+                        x1: Math.min(dragBounds.left, oLeft) - 40,
+                        x2: Math.max(dragBounds.right, oRight) + 40,
+                        isCenter: true
+                    });
+                }
+
+                // Top-to-Top
+                const diffTopTop = Math.abs(dragBounds.top - oTop);
+                if (diffTopTop <= SNAP_THRESHOLD && diffTopTop < bestDiffY) {
+                    bestDiffY = diffTopTop;
+                    snappedY = oTop;
+                    activeGuideLines = activeGuideLines.filter(g => g.axis !== 'y');
+                    activeGuideLines.push({
+                        axis: 'y',
+                        coord: oTop,
+                        x1: Math.min(dragBounds.left, oLeft) - 40,
+                        x2: Math.max(dragBounds.right, oRight) + 40,
+                        isCenter: false
+                    });
+                }
+
+                // Bottom-to-Bottom
+                const diffBottomBottom = Math.abs(dragBounds.bottom - oBottom);
+                if (diffBottomBottom <= SNAP_THRESHOLD && diffBottomBottom < bestDiffY) {
+                    bestDiffY = diffBottomBottom;
+                    snappedY = oBottom - h;
+                    activeGuideLines = activeGuideLines.filter(g => g.axis !== 'y');
+                    activeGuideLines.push({
+                        axis: 'y',
+                        coord: oBottom,
+                        x1: Math.min(dragBounds.left, oLeft) - 40,
+                        x2: Math.max(dragBounds.right, oRight) + 40,
+                        isCenter: false
+                    });
+                }
+
+                // Top-to-Bottom
+                const diffTopBottom = Math.abs(dragBounds.top - oBottom);
+                if (diffTopBottom <= SNAP_THRESHOLD && diffTopBottom < bestDiffY) {
+                    bestDiffY = diffTopBottom;
+                    snappedY = oBottom;
+                    activeGuideLines = activeGuideLines.filter(g => g.axis !== 'y');
+                    activeGuideLines.push({
+                        axis: 'y',
+                        coord: oBottom,
+                        x1: Math.min(dragBounds.left, oLeft) - 40,
+                        x2: Math.max(dragBounds.right, oRight) + 40,
+                        isCenter: false
+                    });
+                }
+
+                // Bottom-to-Top
+                const diffBottomTop = Math.abs(dragBounds.bottom - oTop);
+                if (diffBottomTop <= SNAP_THRESHOLD && diffBottomTop < bestDiffY) {
+                    bestDiffY = diffBottomTop;
+                    snappedY = oTop - h;
+                    activeGuideLines = activeGuideLines.filter(g => g.axis !== 'y');
+                    activeGuideLines.push({
+                        axis: 'y',
+                        coord: oTop,
+                        x1: Math.min(dragBounds.left, oLeft) - 40,
+                        x2: Math.max(dragBounds.right, oRight) + 40,
+                        isCenter: false
+                    });
+                }
+            });
+
+            return {
+                x: snappedX,
+                y: snappedY,
+                guides: activeGuideLines
+            };
+        }
+
+        /**
+         * Render garis pemandu visual di layer SVG (Canva / Figma style)
+         */
+        function renderAlignmentGuides(guides) {
+            let guidesLayer = svgElement.querySelector('#alignmentGuidesLayer');
+            if (!guidesLayer) {
+                guidesLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                guidesLayer.id = 'alignmentGuidesLayer';
+                guidesLayer.setAttribute('class', 'diagram-alignment-guides-layer');
+                svgElement.appendChild(guidesLayer);
+            }
+
+            guidesLayer.innerHTML = '';
+            if (!guides || guides.length === 0) return;
+
+            guides.forEach(g => {
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                if (g.axis === 'x') {
+                    line.setAttribute('x1', g.coord);
+                    line.setAttribute('y1', g.y1);
+                    line.setAttribute('x2', g.coord);
+                    line.setAttribute('y2', g.y2);
+                } else {
+                    line.setAttribute('x1', g.x1);
+                    line.setAttribute('y1', g.coord);
+                    line.setAttribute('x2', g.x2);
+                    line.setAttribute('y2', g.coord);
+                }
+
+                line.setAttribute('class', 'diagram-guide-line' + (g.isCenter ? ' guide-center' : ''));
+                guidesLayer.appendChild(line);
+            });
+        }
+
+        /**
+         * Hapus semua garis pemandu alignment
+         */
+        function clearAlignmentGuides() {
+            const guidesLayer = svgElement.querySelector('#alignmentGuidesLayer');
+            if (guidesLayer) {
+                guidesLayer.innerHTML = '';
+            }
+        }
+
+        /**
          * Pasang interaksi drag & drop pada kartu kelas
          */
         function attachNodeDragEvents(cardElement, nodeId) {
@@ -306,17 +584,29 @@ window.DiagramCanvas = (function () {
                     y: mouseCanvasY - pos.y
                 };
 
+                let hasMoved = false;
+
                 const onMouseMove = (moveEvent) => {
                     if (state.activeDragNodeId !== nodeId) return;
+                    hasMoved = true;
 
                     const curCanvasX = (moveEvent.clientX - state.panX) / state.zoom;
                     const curCanvasY = (moveEvent.clientY - state.panY) / state.zoom;
 
-                    pos.x = Math.round(curCanvasX - state.dragOffset.x);
-                    pos.y = Math.round(curCanvasY - state.dragOffset.y);
+                    const rawX = Math.round(curCanvasX - state.dragOffset.x);
+                    const rawY = Math.round(curCanvasY - state.dragOffset.y);
+
+                    // Deteksi magnetik smart snapping & guidelines (Canva UX)
+                    const snapResult = checkSmartSnapping(nodeId, rawX, rawY);
+
+                    pos.x = snapResult.x;
+                    pos.y = snapResult.y;
 
                     cardElement.style.left = pos.x + 'px';
                     cardElement.style.top = pos.y + 'px';
+
+                    // Tampilkan garis pemandu sejajar
+                    renderAlignmentGuides(snapResult.guides);
 
                     // Update garis relasi secara realtime saat node digeser
                     updateConnectors();
@@ -325,8 +615,17 @@ window.DiagramCanvas = (function () {
                 const onMouseUp = () => {
                     state.activeDragNodeId = null;
                     cardElement.classList.remove('is-dragging');
+                    clearAlignmentGuides();
                     window.removeEventListener('mousemove', onMouseMove);
                     window.removeEventListener('mouseup', onMouseUp);
+
+                    // Jika ada pergeseran kartu, simpan ke memori dan picu event posisi
+                    if (hasMoved) {
+                        state.savedLayoutData = getLayoutData();
+                        if (typeof state.onPositionChange === 'function') {
+                            state.onPositionChange(state.savedLayoutData);
+                        }
+                    }
                 };
 
                 window.addEventListener('mousemove', onMouseMove);
@@ -339,8 +638,9 @@ window.DiagramCanvas = (function () {
          * Menggunakan Manhattan Orthogonal Router bebas tabrakan (zero card collision).
          */
         function updateConnectors() {
-            // Bersihkan semua elemen lama kecuali <defs>
+            // Bersihkan semua elemen lama kecuali <defs> dan <g id="alignmentGuidesLayer">
             const defs = svgElement.querySelector('defs');
+            const guidesLayer = svgElement.querySelector('#alignmentGuidesLayer');
             svgElement.innerHTML = '';
             if (defs) svgElement.appendChild(defs);
 
@@ -365,6 +665,8 @@ window.DiagramCanvas = (function () {
                 // Render kardinalitas & label
                 renderRelationLabels(route);
             });
+
+            if (guidesLayer) svgElement.appendChild(guidesLayer);
         }
 
         /**
@@ -453,21 +755,42 @@ window.DiagramCanvas = (function () {
         }
 
         function renderCardinalityText(point, side, text) {
-            let offsetX = 0;
-            let offsetY = 0;
+            let posX = point.x;
+            let posY = point.y;
+            let anchor = 'start';
 
-            if (side === 'top') offsetY = -10;
-            else if (side === 'bottom') offsetY = 14;
-            else if (side === 'left') offsetX = -14;
-            else if (side === 'right') offsetX = 14;
+            // Geser ke samping garis dan beri clearance agar teks '1' atau 'N' tidak pernah tertutup garis
+            if (side === 'top') {
+                posX += 9;
+                posY -= 12;
+                anchor = 'start';
+            } else if (side === 'bottom') {
+                posX += 9;
+                posY += 14;
+                anchor = 'start';
+            } else if (side === 'left') {
+                posX -= 10;
+                posY -= 9;
+                anchor = 'end';
+            } else if (side === 'right') {
+                posX += 10;
+                posY -= 9;
+                anchor = 'start';
+            }
+
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.setAttribute('class', 'cardinality-group');
 
             const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            t.setAttribute('x', point.x + offsetX);
-            t.setAttribute('y', point.y + offsetY);
-            t.setAttribute('text-anchor', 'middle');
+            t.setAttribute('x', posX);
+            t.setAttribute('y', posY);
+            t.setAttribute('text-anchor', anchor);
+            t.setAttribute('dominant-baseline', 'middle');
             t.setAttribute('class', 'cardinality-text');
             t.textContent = text;
-            svgElement.appendChild(t);
+
+            g.appendChild(t);
+            svgElement.appendChild(g);
         }
 
         /**
@@ -649,6 +972,43 @@ window.DiagramCanvas = (function () {
             };
         }
 
+        function getLayoutData() {
+            const positions = {};
+            state.nodePositions.forEach((pos, id) => {
+                positions[id] = {
+                    x: pos.x,
+                    y: pos.y,
+                    width: pos.width,
+                    height: pos.height
+                };
+            });
+            return {
+                positions: positions,
+                zoom: state.zoom,
+                panX: state.panX,
+                panY: state.panY
+            };
+        }
+
+        function setLayoutData(layout) {
+            state.savedLayoutData = layout;
+            if (layout && layout.positions) {
+                Object.keys(layout.positions).forEach(id => {
+                    if (state.nodePositions.has(id)) {
+                        const cur = state.nodePositions.get(id);
+                        if (typeof layout.positions[id].x === 'number') cur.x = layout.positions[id].x;
+                        if (typeof layout.positions[id].y === 'number') cur.y = layout.positions[id].y;
+                        const card = document.getElementById('node_' + id);
+                        if (card) {
+                            card.style.left = cur.x + 'px';
+                            card.style.top = cur.y + 'px';
+                        }
+                    }
+                });
+                updateConnectors();
+            }
+        }
+
         return {
             render: render,
             autoFit: autoFit,
@@ -658,6 +1018,9 @@ window.DiagramCanvas = (function () {
             relayout: relayout,
             updateConnectors: updateConnectors,
             getStats: getStats,
+            getLayoutData: getLayoutData,
+            setLayoutData: setLayoutData,
+            onPositionChange: (cb) => { state.onPositionChange = cb; },
             onUpdate: (cb) => { state.onUpdate = cb; },
             getState: () => state
         };

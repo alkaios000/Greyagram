@@ -367,16 +367,47 @@ window.DiagramExport = (function () {
     function drawCardText(ctx, point, side, text) {
         let tx = point.x;
         let ty = point.y;
-        if (side === 'top') ty -= 8;
-        else if (side === 'bottom') ty += 14;
-        else if (side === 'left') tx -= 14;
-        else if (side === 'right') tx += 14;
+        let align = 'start';
 
-        ctx.font = '600 10px Inter, sans-serif';
-        ctx.fillStyle = '#4b5563';
-        ctx.textAlign = 'center';
+        if (side === 'top') {
+            tx += 9;
+            ty -= 12;
+            align = 'start';
+        } else if (side === 'bottom') {
+            tx += 9;
+            ty += 14;
+            align = 'start';
+        } else if (side === 'left') {
+            tx -= 10;
+            ty -= 9;
+            align = 'end';
+        } else if (side === 'right') {
+            tx += 10;
+            ty -= 9;
+            align = 'start';
+        }
+
+        ctx.save();
+        ctx.font = '700 11px Inter, sans-serif';
+        ctx.textAlign = align;
         ctx.textBaseline = 'middle';
+
+        // Garis keliling (halo) putih tebal agar garis di belakang tidak menembus teks
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 4;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(text, tx, ty);
+
+        ctx.fillStyle = '#1f2937';
         ctx.fillText(text, tx, ty);
+        ctx.restore();
+    }
+
+    function getCardinalitySvgPos(x, y, side) {
+        if (side === 'top') return { x: x + 9, y: y - 12, anchor: 'start' };
+        if (side === 'bottom') return { x: x + 9, y: y + 14, anchor: 'start' };
+        if (side === 'left') return { x: x - 10, y: y - 9, anchor: 'end' };
+        return { x: x + 10, y: y - 9, anchor: 'start' };
     }
 
     function drawRoundedRect(ctx, x, y, width, height, radius, fill, stroke) {
@@ -490,6 +521,17 @@ window.DiagramExport = (function () {
                 const tw = rel.label.length * 7 + 14;
                 svgContent += `  <g><rect x="${lx - tw/2}" y="${ly - 10}" width="${tw}" height="20" rx="4" fill="#ffffff" stroke="#d1d5db" /><text x="${lx}" y="${ly + 4}" text-anchor="middle" font-size="11" font-weight="500" fill="#4b5563">${rel.label}</text></g>\n`;
             }
+
+            // Kardinalitas Sumber & Target pada SVG
+            const conn = route.connection;
+            if (rel.sourceCard && conn && conn.source) {
+                const cPos = getCardinalitySvgPos(conn.source.x + offsetX, conn.source.y + offsetY, conn.sourceSide);
+                svgContent += `  <text x="${cPos.x}" y="${cPos.y}" text-anchor="${cPos.anchor}" dominant-baseline="middle" font-size="11" font-weight="700" fill="#1f2937" stroke="#ffffff" stroke-width="3.5" paint-order="stroke fill" stroke-linejoin="round">${rel.sourceCard}</text>\n`;
+            }
+            if (rel.targetCard && conn && conn.target) {
+                const cPos = getCardinalitySvgPos(conn.target.x + offsetX, conn.target.y + offsetY, conn.targetSide);
+                svgContent += `  <text x="${cPos.x}" y="${cPos.y}" text-anchor="${cPos.anchor}" dominant-baseline="middle" font-size="11" font-weight="700" fill="#1f2937" stroke="#ffffff" stroke-width="3.5" paint-order="stroke fill" stroke-linejoin="round">${rel.targetCard}</text>\n`;
+            }
         });
 
         // Cards
@@ -539,9 +581,90 @@ window.DiagramExport = (function () {
         return true;
     }
 
+    /**
+     * Hasilkan pratinjau thumbnail ringkas sebagai Data URL (JPEG/PNG)
+     * Digunakan untuk galeri proyek pengguna.
+     * @param {Object} canvasState
+     * @param {number} maxThumbWidth
+     * @param {number} maxThumbHeight
+     * @returns {string|null} Data URL citra pratinjau
+     */
+    function generateThumbnail(canvasState, maxThumbWidth = 480, maxThumbHeight = 300) {
+        try {
+            const classes = canvasState.classes || [];
+            const relations = canvasState.relations || [];
+            const positions = canvasState.nodePositions;
+
+            if (classes.length === 0 || !positions) {
+                return null;
+            }
+
+            // Hitung bounding box diagram
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            classes.forEach(cls => {
+                const pos = positions.get(cls.id);
+                if (pos) {
+                    minX = Math.min(minX, pos.x);
+                    minY = Math.min(minY, pos.y);
+                    maxX = Math.max(maxX, pos.x + (pos.width || 260));
+                    maxY = Math.max(maxY, pos.y + (pos.height || 160));
+                }
+            });
+
+            if (minX === Infinity || maxX === -Infinity) return null;
+
+            const padding = 40;
+            const diagramWidth = Math.max(300, (maxX - minX) + padding * 2);
+            const diagramHeight = Math.max(200, (maxY - minY) + padding * 2);
+
+            // Hitung rasio skala agar pas dalam dimensi thumbnail
+            const scale = Math.min(maxThumbWidth / diagramWidth, maxThumbHeight / diagramHeight, 1.0);
+            const targetW = Math.max(160, Math.round(diagramWidth * scale));
+            const targetH = Math.max(120, Math.round(diagramHeight * scale));
+
+            const canvas = document.createElement('canvas');
+            canvas.width = targetW;
+            canvas.height = targetH;
+
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, targetW, targetH);
+
+            ctx.save();
+            ctx.scale(scale, scale);
+
+            const offsetX = -minX + padding;
+            const offsetY = -minY + padding;
+
+            // Gambar relasi konektor
+            if (window.DiagramRouter && relations.length > 0) {
+                const routes = DiagramRouter.calculateRoutes(relations, positions);
+                routes.forEach(route => {
+                    drawConnectorOnCanvas(ctx, route, offsetX, offsetY);
+                });
+            }
+
+            // Gambar kartu kelas
+            classes.forEach(cls => {
+                const pos = positions.get(cls.id);
+                if (pos) {
+                    drawClassCardOnCanvas(ctx, cls, pos.x + offsetX, pos.y + offsetY, pos.width, pos.height);
+                }
+            });
+
+            ctx.restore();
+
+            return canvas.toDataURL('image/jpeg', 0.82);
+        } catch (e) {
+            console.warn('Gagal menghasilkan thumbnail diagram:', e);
+            return null;
+        }
+    }
+
     return {
         downloadPNG: downloadPNG,
-        downloadSVG: downloadSVG
+        downloadSVG: downloadSVG,
+        generateThumbnail: generateThumbnail
     };
 })();
 

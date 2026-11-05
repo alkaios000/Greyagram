@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS `diagrams` (
     `description` TEXT NULL,
     `type` VARCHAR(50) NOT NULL DEFAULT 'class',
     `code` LONGTEXT NOT NULL,
+    `layout_data` LONGTEXT NULL,
+    `thumbnail` LONGTEXT NULL,
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX `idx_diagrams_user_id` (`user_id`),

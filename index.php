@@ -70,6 +70,49 @@ try {
             $controller->index();
             break;
 
+        case 'projects':
+        case 'diagram/projects':
+            require_once __DIR__ . '/controllers/diagram_controller.php';
+            $controller = new DiagramController();
+            $controller->projects();
+            break;
+
+        case 'diagram/save':
+            require_once __DIR__ . '/controllers/diagram_controller.php';
+            $controller = new DiagramController();
+            $controller->save();
+            break;
+
+        case 'diagram/save_positions':
+            require_once __DIR__ . '/controllers/diagram_controller.php';
+            $controller = new DiagramController();
+            $controller->savePositions();
+            break;
+
+        case 'diagram/duplicate':
+            require_once __DIR__ . '/controllers/diagram_controller.php';
+            $controller = new DiagramController();
+            $controller->duplicate();
+            break;
+
+        case 'diagram/list':
+            require_once __DIR__ . '/controllers/diagram_controller.php';
+            $controller = new DiagramController();
+            $controller->list();
+            break;
+
+        case 'diagram/load':
+            require_once __DIR__ . '/controllers/diagram_controller.php';
+            $controller = new DiagramController();
+            $controller->load();
+            break;
+
+        case 'diagram/delete':
+            require_once __DIR__ . '/controllers/diagram_controller.php';
+            $controller = new DiagramController();
+            $controller->delete();
+            break;
+
         default:
             http_response_code(404);
             $page_title = '404 - Halaman Tidak Ditemukan';

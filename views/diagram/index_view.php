@@ -12,7 +12,6 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                 <i class="fa-solid fa-code"></i>
                 <span class="btn-text">Editor Kode</span>
             </button>
-            <div class="toolbar-divider"></div>
             <div class="template-selector-wrap">
                 <label for="templateSelect" class="sr-only">Pilih Template</label>
                 <select id="templateSelect" class="form-control form-control-sm template-select">
@@ -23,9 +22,30 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                     <option value="hospital">Template: Hospital & Healthcare</option>
                 </select>
             </div>
+            <div class="toolbar-divider"></div>
+            <a href="<?= base_url('projects') ?>" class="btn btn-outline toolbar-btn" title="Buka Galeri Seluruh Proyek">
+                <i class="fa-solid fa-layer-group"></i>
+                <span class="btn-text">Proyek Saya</span>
+            </a>
+            <button type="button" class="btn btn-outline toolbar-btn" id="btnOpenDiagrams" title="Buka Diagram Tersimpan Anda di Database">
+                <i class="fa-solid fa-folder-open"></i>
+                <span class="btn-text">Buka</span>
+            </button>
+            <button type="button" class="btn btn-outline toolbar-btn" id="btnSaveDiagram" title="Simpan Diagram ke Database Per User">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span class="btn-text">Simpan</span>
+            </button>
         </div>
 
         <div class="toolbar-center">
+            <div class="diagram-active-title" id="diagramActiveTitle" title="Diagram Aktif">
+                <i class="fa-solid fa-diagram-project"></i>
+                <span id="displayDiagramTitle"><?= htmlspecialchars($current_diagram_title, ENT_QUOTES, 'UTF-8') ?></span>
+            </div>
+            <div id="saveStatusBadge" class="save-status-badge saved" style="display: none;" title="Status penyimpanan diagram">
+                <i class="fa-solid fa-circle-check" id="saveStatusIcon"></i>
+                <span id="saveStatusText">Tersimpan</span>
+            </div>
             <div class="diagram-meta-badge">
                 <span id="badgeNodeCount">0 Kelas</span>
                 <span class="meta-dot">&bull;</span>
@@ -131,6 +151,75 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                 <span>Tarik latar untuk Pan &bull; Drag header kartu untuk geser &bull; Scroll untuk Zoom</span>
             </div>
         </section>
+    </div>
+
+    <!-- Modal Simpan Diagram -->
+    <div class="diagram-modal-backdrop" id="modalSaveDiagram">
+        <div class="diagram-modal-box">
+            <div class="diagram-modal-header">
+                <div class="diagram-modal-title">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                    <span>Simpan Diagram ke Database</span>
+                </div>
+                <button type="button" class="diagram-modal-close" id="btnCloseSaveModal" title="Tutup">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="diagram-modal-body">
+                <div class="form-group mb-3">
+                    <label for="inputSaveTitle" class="form-label font-weight-bold" style="font-size: 0.85rem; color: #374151;">Judul Diagram <span class="text-danger">*</span></label>
+                    <input type="text" id="inputSaveTitle" class="form-control" placeholder="Contoh: Arsitektur Sistem Presensi & HR" value="<?= htmlspecialchars($current_diagram_title, ENT_QUOTES, 'UTF-8') ?>">
+                </div>
+                <div class="form-group mb-2">
+                    <label for="inputSaveDesc" class="form-label" style="font-size: 0.85rem; color: #374151;">Deskripsi / Catatan (Opsional)</label>
+                    <textarea id="inputSaveDesc" class="form-control" rows="2" placeholder="Catatan versi atau ringkasan diagram..."></textarea>
+                </div>
+                <p class="text-muted small mb-0" style="font-size: 0.75rem;">
+                    <i class="fa-solid fa-shield-halved"></i> Diagram disimpan secara aman ke database khusus untuk akun Anda.
+                </p>
+            </div>
+            <div class="diagram-modal-footer">
+                <button type="button" class="btn btn-outline" id="btnCancelSaveModal">Batal</button>
+                <button type="button" class="btn btn-primary" id="btnSubmitSaveDiagram">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Simpan Sekarang</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Daftar Diagram Tersimpan -->
+    <div class="diagram-modal-backdrop" id="modalListDiagram">
+        <div class="diagram-modal-box">
+            <div class="diagram-modal-header">
+                <div class="diagram-modal-title">
+                    <i class="fa-solid fa-folder-open"></i>
+                    <span>Diagram Tersimpan Anda</span>
+                </div>
+                <button type="button" class="diagram-modal-close" id="btnCloseListModal" title="Tutup">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="diagram-modal-body" id="diagramListContainer" style="min-height: 180px;">
+                <div class="text-center py-4 text-muted">
+                    <i class="fa-solid fa-spinner fa-spin fa-2x mb-2" style="color: var(--btn-primary);"></i>
+                    <p style="font-size: 0.85rem;">Memuat daftar diagram...</p>
+                </div>
+            </div>
+            <div class="diagram-modal-footer">
+                <button type="button" class="btn btn-outline" id="btnCloseListModalBtn">Tutup</button>
+                <button type="button" class="btn btn-primary" id="btnNewDiagram">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Buat Diagram Baru</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Toast Notification -->
+    <div class="diagram-toast" id="diagramToast">
+        <i class="fa-solid fa-circle-check" id="toastIcon"></i>
+        <span id="toastMessage">Diagram berhasil disimpan!</span>
     </div>
 </main>
 
@@ -362,6 +451,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnExportPng = document.getElementById('btnExportPng');
     const btnExportSvg = document.getElementById('btnExportSvg');
 
+    let currentDiagramId = <?= json_encode($current_diagram_id) ?>;
+    let currentDiagramTitle = <?= json_encode($current_diagram_title) ?>;
+    let currentLayoutData = <?= json_encode($current_layout_data ? json_decode($current_layout_data, true) : null) ?>;
+
     // Buat Canvas Controller
     const canvas = DiagramCanvas.create(canvasArea, svgLayer, nodesLayer);
 
@@ -373,7 +466,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Fungsi Render dari Kode
-    function compileAndRender(code, autoFit = true) {
+    function compileAndRender(code, autoFit = true, customLayout = null) {
         const errorBanner = document.getElementById('parseErrorBanner');
         const errorMessage = document.getElementById('parseErrorMessage');
 
@@ -400,7 +493,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             hideError();
-            canvas.render(parsed.classes, parsed.relations, autoFit);
+            canvas.render(parsed.classes, parsed.relations, autoFit, customLayout);
             return true;
         } catch (err) {
             console.error('Diagram Compile Error:', err);
@@ -409,8 +502,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Render awal saat halaman dimuat
-    compileAndRender(codeInput.value, true);
+    // Render awal saat halaman dimuat (terapkan posisi tersimpan jika ada)
+    compileAndRender(codeInput.value, currentLayoutData ? false : true, currentLayoutData);
 
     // Event Listener Terapkan Kode
     btnApply.addEventListener('click', () => {
@@ -516,6 +609,401 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', () => {
         canvas.updateConnectors();
     });
+
+    // ==========================================
+    // LOGIKA PENYIMPANAN DATABASE (PER USER)
+    // ==========================================
+    const btnSaveDiagram = document.getElementById('btnSaveDiagram');
+    const btnOpenDiagrams = document.getElementById('btnOpenDiagrams');
+    const displayDiagramTitle = document.getElementById('displayDiagramTitle');
+
+    const saveStatusBadge = document.getElementById('saveStatusBadge');
+    const saveStatusText = document.getElementById('saveStatusText');
+    const saveStatusIcon = document.getElementById('saveStatusIcon');
+    let autoSaveTimer = null;
+
+    function updateSaveStatus(status, text) {
+        if (!saveStatusBadge) return;
+        saveStatusBadge.style.display = 'inline-flex';
+        saveStatusBadge.className = 'save-status-badge ' + status;
+        if (saveStatusText) saveStatusText.textContent = text;
+        if (saveStatusIcon) {
+            if (status === 'saving') saveStatusIcon.className = 'fa-solid fa-spinner fa-spin';
+            else if (status === 'saved') saveStatusIcon.className = 'fa-solid fa-circle-check text-success';
+            else saveStatusIcon.className = 'fa-solid fa-cloud';
+        }
+    }
+
+    if (currentDiagramId) {
+        updateSaveStatus('saved', 'Tersimpan');
+    }
+
+    // Tangkap perubahan posisi kartu (drag & drop) untuk auto-save posisi ke database
+    canvas.onPositionChange((layoutData) => {
+        if (currentDiagramId) {
+            updateSaveStatus('saving', 'Menyimpan posisi...');
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = setTimeout(async () => {
+                try {
+                    const thumbData = DiagramExport.generateThumbnail(canvas.getState());
+                    const response = await fetch('<?= base_url('diagram/save_positions') ?>', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            id: currentDiagramId,
+                            layout_data: layoutData,
+                            thumbnail: thumbData
+                        })
+                    });
+                    const res = await response.json();
+                    if (res.success) {
+                        updateSaveStatus('saved', 'Posisi tersimpan');
+                    } else {
+                        updateSaveStatus('unsaved', 'Perubahan belum disimpan');
+                    }
+                } catch (e) {
+                    updateSaveStatus('unsaved', 'Perubahan belum disimpan');
+                }
+            }, 800);
+        } else {
+            updateSaveStatus('unsaved', 'Posisi diubah (Belum disimpan)');
+        }
+    });
+
+    const modalSave = document.getElementById('modalSaveDiagram');
+    const btnCloseSaveModal = document.getElementById('btnCloseSaveModal');
+    const btnCancelSaveModal = document.getElementById('btnCancelSaveModal');
+    const btnSubmitSaveDiagram = document.getElementById('btnSubmitSaveDiagram');
+    const inputSaveTitle = document.getElementById('inputSaveTitle');
+    const inputSaveDesc = document.getElementById('inputSaveDesc');
+
+    const modalList = document.getElementById('modalListDiagram');
+    const btnCloseListModal = document.getElementById('btnCloseListModal');
+    const btnCloseListModalBtn = document.getElementById('btnCloseListModalBtn');
+    const btnNewDiagram = document.getElementById('btnNewDiagram');
+    const diagramListContainer = document.getElementById('diagramListContainer');
+
+    const diagramToast = document.getElementById('diagramToast');
+    const toastIcon = document.getElementById('toastIcon');
+    const toastMessage = document.getElementById('toastMessage');
+
+    let toastTimer = null;
+
+    function showToast(msg, isError = false) {
+        if (toastTimer) clearTimeout(toastTimer);
+        toastMessage.textContent = msg;
+        if (isError) {
+            diagramToast.classList.add('toast-error');
+            toastIcon.className = 'fa-solid fa-circle-exclamation';
+        } else {
+            diagramToast.classList.remove('toast-error');
+            toastIcon.className = 'fa-solid fa-circle-check';
+        }
+
+        diagramToast.classList.add('is-show');
+        toastTimer = setTimeout(() => {
+            diagramToast.classList.remove('is-show');
+        }, 3200);
+    }
+
+    function openModal(modalEl) {
+        if (modalEl) modalEl.classList.add('is-open');
+    }
+
+    function closeModal(modalEl) {
+        if (modalEl) modalEl.classList.remove('is-open');
+    }
+
+    // Tutup modal jika klik di luar kotak modal
+    [modalSave, modalList].forEach(m => {
+        if (m) {
+            m.addEventListener('click', (e) => {
+                if (e.target === m) closeModal(m);
+            });
+        }
+    });
+
+    if (btnCloseSaveModal) btnCloseSaveModal.addEventListener('click', () => closeModal(modalSave));
+    if (btnCancelSaveModal) btnCancelSaveModal.addEventListener('click', () => closeModal(modalSave));
+    if (btnCloseListModal) btnCloseListModal.addEventListener('click', () => closeModal(modalList));
+    if (btnCloseListModalBtn) btnCloseListModalBtn.addEventListener('click', () => closeModal(modalList));
+
+    // Buka Modal Simpan
+    if (btnSaveDiagram) {
+        btnSaveDiagram.addEventListener('click', () => {
+            if (inputSaveTitle) {
+                inputSaveTitle.value = currentDiagramTitle || 'Diagram Tanpa Judul';
+            }
+            openModal(modalSave);
+            setTimeout(() => { if (inputSaveTitle) inputSaveTitle.focus(); }, 150);
+        });
+    }
+
+    // Submit Simpan Diagram ke Database
+    if (btnSubmitSaveDiagram) {
+        btnSubmitSaveDiagram.addEventListener('click', async () => {
+            const title = inputSaveTitle.value.trim() || 'Diagram Tanpa Judul';
+            const desc = inputSaveDesc ? inputSaveDesc.value.trim() : '';
+            const code = codeInput.value;
+
+            if (!code || code.trim() === '') {
+                showToast('Kode diagram tidak boleh kosong.', true);
+                return;
+            }
+
+            const origContent = btnSubmitSaveDiagram.innerHTML;
+            btnSubmitSaveDiagram.disabled = true;
+            btnSubmitSaveDiagram.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+
+            try {
+                // Tangkap layout posisi kartu dan pratinjau thumbnail
+                const layoutData = canvas.getLayoutData();
+                const thumbData = DiagramExport.generateThumbnail(canvas.getState());
+
+                const response = await fetch('<?= base_url('diagram/save') ?>', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        id: currentDiagramId,
+                        title: title,
+                        description: desc,
+                        code: code,
+                        layout_data: layoutData,
+                        thumbnail: thumbData
+                    })
+                });
+
+                const res = await response.json();
+
+                if (res.success) {
+                    currentDiagramId = res.id;
+                    currentDiagramTitle = res.title;
+                    currentLayoutData = layoutData;
+                    if (displayDiagramTitle) displayDiagramTitle.textContent = res.title;
+
+                    updateSaveStatus('saved', 'Tersimpan');
+
+                    // Update URL browser tanpa reload halaman
+                    const newUrl = '<?= base_url('diagram') ?>?id=' + res.id;
+                    window.history.pushState({ diagramId: res.id }, res.title, newUrl);
+
+                    closeModal(modalSave);
+                    showToast(res.message || 'Diagram berhasil disimpan ke database!');
+                } else {
+                    showToast(res.message || 'Gagal menyimpan diagram.', true);
+                }
+            } catch (err) {
+                showToast('Terjadi kesalahan jaringan: ' + err.message, true);
+            } finally {
+                btnSubmitSaveDiagram.disabled = false;
+                btnSubmitSaveDiagram.innerHTML = origContent;
+            }
+        });
+    }
+
+    // Buka Modal Daftar Diagram
+    if (btnOpenDiagrams) {
+        btnOpenDiagrams.addEventListener('click', () => {
+            openModal(modalList);
+            loadDiagramList();
+        });
+    }
+
+    // Ambil Daftar Diagram dari Database
+    async function loadDiagramList() {
+        if (!diagramListContainer) return;
+        diagramListContainer.innerHTML = `
+            <div class="text-center py-4 text-muted">
+                <i class="fa-solid fa-spinner fa-spin fa-2x mb-2" style="color: var(--btn-primary);"></i>
+                <p style="font-size: 0.85rem;">Memuat daftar diagram...</p>
+            </div>
+        `;
+
+        try {
+            const response = await fetch('<?= base_url('diagram/list') ?>', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const res = await response.json();
+
+            if (res.success && res.data && res.data.length > 0) {
+                let html = '<div style="display: flex; flex-direction: column; gap: 0.75rem;">';
+                res.data.forEach(item => {
+                    const isCurrent = (currentDiagramId && parseInt(item.id) === parseInt(currentDiagramId));
+                    const activeBadge = isCurrent ? '<span class="badge" style="background-color: #e0e7ff; color: #4338ca; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; margin-left: 6px;">Sedang Aktif</span>' : '';
+                    
+                    html += `
+                        <div class="diagram-item-card" style="${isCurrent ? 'border-color: #4a80f0; background-color: #f8faff;' : ''}">
+                            <div class="diagram-item-info">
+                                <div class="diagram-item-title">
+                                    <i class="fa-solid fa-file-code" style="color: var(--btn-primary); margin-right: 4px;"></i>
+                                    <span>${escapeHtml(item.title)}</span>
+                                    ${activeBadge}
+                                </div>
+                                <div class="diagram-item-meta">
+                                    <span>Diperbarui: ${escapeHtml(item.updated_at || item.created_at)}</span>
+                                    ${item.description ? ` &bull; <span>${escapeHtml(item.description)}</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="diagram-item-actions">
+                                <button type="button" class="btn btn-sm btn-outline btn-load-diagram" data-id="${item.id}" title="Muat Diagram Ini">
+                                    <i class="fa-solid fa-folder-open"></i> Buka
+                                </button>
+                                <button type="button" class="btn btn-sm btn-icon btn-delete-diagram" data-id="${item.id}" title="Hapus Diagram Ini" style="color: #ef4444; border-color: #fecaca;">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                diagramListContainer.innerHTML = html;
+
+                // Pasang event listener tombol Buka
+                diagramListContainer.querySelectorAll('.btn-load-diagram').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.getAttribute('data-id');
+                        loadSingleDiagram(id);
+                    });
+                });
+
+                // Pasang event listener tombol Hapus
+                diagramListContainer.querySelectorAll('.btn-delete-diagram').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = btn.getAttribute('data-id');
+                        deleteDiagram(id);
+                    });
+                });
+            } else {
+                diagramListContainer.innerHTML = `
+                    <div class="text-center py-4" style="color: #6b7280;">
+                        <i class="fa-solid fa-box-open fa-2x mb-2" style="opacity: 0.5;"></i>
+                        <p style="font-size: 0.9rem; margin-bottom: 0.25rem;">Belum ada diagram yang tersimpan di akun Anda.</p>
+                        <p style="font-size: 0.8rem; color: #9ca3af;">Gunakan tombol "Simpan" di toolbar untuk menyimpan diagram saat ini.</p>
+                    </div>
+                `;
+            }
+        } catch (err) {
+            diagramListContainer.innerHTML = `
+                <div class="text-center py-4 text-danger">
+                    <i class="fa-solid fa-circle-exclamation fa-2x mb-2"></i>
+                    <p style="font-size: 0.85rem;">Gagal memuat daftar diagram: ${escapeHtml(err.message)}</p>
+                </div>
+            `;
+        }
+    }
+
+    // Muat satu diagram tertentu ke kanvas dan editor
+    async function loadSingleDiagram(id) {
+        try {
+            const response = await fetch('<?= base_url('diagram/load') ?>?id=' + id, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const res = await response.json();
+
+            if (res.success && res.diagram) {
+                currentDiagramId = res.diagram.id;
+                currentDiagramTitle = res.diagram.title;
+                if (displayDiagramTitle) displayDiagramTitle.textContent = res.diagram.title;
+
+                codeInput.value = res.diagram.code;
+
+                let loadedLayout = null;
+                if (res.diagram.layout_data) {
+                    try {
+                        loadedLayout = (typeof res.diagram.layout_data === 'string') 
+                            ? JSON.parse(res.diagram.layout_data) 
+                            : res.diagram.layout_data;
+                    } catch(e) {}
+                }
+                currentLayoutData = loadedLayout;
+                compileAndRender(res.diagram.code, loadedLayout ? false : true, loadedLayout);
+                updateSaveStatus('saved', 'Tersimpan');
+
+                const newUrl = '<?= base_url('diagram') ?>?id=' + res.diagram.id;
+                window.history.pushState({ diagramId: res.diagram.id }, res.diagram.title, newUrl);
+
+                closeModal(modalList);
+                showToast(`Diagram "${res.diagram.title}" berhasil dimuat!`);
+            } else {
+                showToast(res.message || 'Gagal memuat diagram.', true);
+            }
+        } catch (err) {
+            showToast('Gagal memuat diagram: ' + err.message, true);
+        }
+    }
+
+    // Hapus diagram dari database
+    async function deleteDiagram(id) {
+        if (!confirm('Apakah Anda yakin ingin menghapus diagram ini dari database?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('<?= base_url('diagram/delete') ?>', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify({ id: id })
+            });
+            const res = await response.json();
+
+            if (res.success) {
+                showToast(res.message || 'Diagram berhasil dihapus.');
+                if (currentDiagramId && parseInt(currentDiagramId) === parseInt(id)) {
+                    currentDiagramId = null;
+                    currentDiagramTitle = 'Diagram Tanpa Judul';
+                    currentLayoutData = null;
+                    if (displayDiagramTitle) displayDiagramTitle.textContent = currentDiagramTitle;
+                    window.history.pushState({}, '', '<?= base_url('diagram') ?>');
+                }
+                loadDiagramList();
+            } else {
+                showToast(res.message || 'Gagal menghapus diagram.', true);
+            }
+        } catch (err) {
+            showToast('Gagal menghapus diagram: ' + err.message, true);
+        }
+    }
+
+    // Tombol Buat Diagram Baru
+    if (btnNewDiagram) {
+        btnNewDiagram.addEventListener('click', () => {
+            currentDiagramId = null;
+            currentDiagramTitle = 'Diagram Tanpa Judul';
+            currentLayoutData = null;
+            if (displayDiagramTitle) displayDiagramTitle.textContent = currentDiagramTitle;
+            window.history.pushState({}, '', '<?= base_url('diagram') ?>');
+
+            if (saveStatusBadge) saveStatusBadge.style.display = 'none';
+
+            // Set ke template e-commerce default
+            if (TEMPLATES.ecommerce) {
+                codeInput.value = TEMPLATES.ecommerce;
+                compileAndRender(codeInput.value, true, null);
+            }
+
+            closeModal(modalList);
+            showToast('Membuat diagram baru.');
+        });
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
 });
 </script>
 
