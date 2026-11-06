@@ -1,17 +1,30 @@
 <?php
 $page_title = 'Diagram Workspace';
+$hide_footer = true;
 require_once __DIR__ . '/../layouts/header.php';
-require_once __DIR__ . '/../layouts/sidebar.php';
+// Dedicated Full-Screen Canvas Workspace (Sidebar omitted for maximum working area)
 ?>
 
 <main class="main-content diagram-main-layout">
     <!-- Top Workspace Toolbar -->
     <header class="diagram-toolbar">
         <div class="toolbar-left">
-            <button type="button" class="btn btn-outline toolbar-btn" id="btnToggleEditor" title="Buka / Tutup Editor Kode">
-                <i class="fa-solid fa-code"></i>
-                <span class="btn-text">Editor Kode</span>
+            <!-- Brand / Back Button to Projects Gallery -->
+            <a href="<?= base_url('projects') ?>" class="btn-workspace-brand" title="Kembali ke Galeri Seluruh Proyek">
+                <i class="fa-solid fa-arrow-left"></i>
+                <span class="brand-text">Greyagram</span>
+            </a>
+
+            <button type="button" class="btn btn-outline toolbar-btn active" id="btnTogglePalette" title="Buka / Tutup Palet Komponen Kelas (Manual Builder)">
+                <i class="fa-solid fa-shapes"></i>
+                <span class="btn-text">Komponen</span>
             </button>
+
+            <button type="button" class="btn btn-outline toolbar-btn" id="btnToggleEditor" title="Buka / Tutup Editor Kode Mermaid">
+                <i class="fa-solid fa-code"></i>
+                <span class="btn-text">Kode</span>
+            </button>
+
             <div class="template-selector-wrap">
                 <label for="templateSelect" class="sr-only">Pilih Template</label>
                 <select id="templateSelect" class="form-control form-control-sm template-select">
@@ -22,15 +35,19 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                     <option value="hospital">Template: Hospital & Healthcare</option>
                 </select>
             </div>
+
             <div class="toolbar-divider"></div>
+
             <a href="<?= base_url('projects') ?>" class="btn btn-outline toolbar-btn" title="Buka Galeri Seluruh Proyek">
                 <i class="fa-solid fa-layer-group"></i>
-                <span class="btn-text">Proyek Saya</span>
+                <span class="btn-text">Proyek</span>
             </a>
+
             <button type="button" class="btn btn-outline toolbar-btn" id="btnOpenDiagrams" title="Buka Diagram Tersimpan Anda di Database">
                 <i class="fa-solid fa-folder-open"></i>
                 <span class="btn-text">Buka</span>
             </button>
+
             <button type="button" class="btn btn-outline toolbar-btn" id="btnSaveDiagram" title="Simpan Diagram ke Database Per User">
                 <i class="fa-solid fa-floppy-disk"></i>
                 <span class="btn-text">Simpan</span>
@@ -42,10 +59,18 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                 <i class="fa-solid fa-diagram-project"></i>
                 <span id="displayDiagramTitle"><?= htmlspecialchars($current_diagram_title, ENT_QUOTES, 'UTF-8') ?></span>
             </div>
+
+            <!-- Fitur Lock Position: Kunci posisi kartu agar tidak bergeser tidak sengaja -->
+            <button type="button" class="btn btn-outline toolbar-btn lock-btn" id="btnToggleLock" title="Kunci / Buka Posisi Kartu pada Kanvas">
+                <i class="fa-solid fa-lock-open" id="iconLock"></i>
+                <span id="labelLock">Bebas</span>
+            </button>
+
             <div id="saveStatusBadge" class="save-status-badge saved" style="display: none;" title="Status penyimpanan diagram">
                 <i class="fa-solid fa-circle-check" id="saveStatusIcon"></i>
                 <span id="saveStatusText">Tersimpan</span>
             </div>
+
             <div class="diagram-meta-badge">
                 <span id="badgeNodeCount">0 Kelas</span>
                 <span class="meta-dot">&bull;</span>
@@ -88,10 +113,86 @@ require_once __DIR__ . '/../layouts/sidebar.php';
         </div>
     </header>
 
-    <!-- Workspace Area (Editor + Canvas) -->
+    <!-- Workspace Area (Left Palette Drawer + Editor Drawer + Canvas) -->
     <div class="diagram-workspace-container">
-        <!-- Collapsible Code Editor Drawer -->
-        <aside class="diagram-editor-drawer" id="diagramEditorDrawer">
+        <!-- Left Component Palette Drawer (Tambah Class Secara Manual & Drag-and-Drop) -->
+        <aside class="diagram-palette-drawer" id="diagramPaletteDrawer">
+            <div class="palette-drawer-header">
+                <div class="palette-title">
+                    <i class="fa-solid fa-shapes"></i>
+                    <span>Komponen Kelas</span>
+                </div>
+                <button type="button" class="drawer-close-btn" id="btnCollapsePalette" title="Sembunyikan Palet">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+            </div>
+
+            <div class="palette-drawer-body">
+                <p class="palette-hint">Drag & drop ke lembar kerja atau klik ikon <b>+</b> untuk menambahkan kelas baru.</p>
+
+                <div class="palette-item-card" draggable="true" data-type="class" title="Tarik atau klik untuk menambah Class standar">
+                    <div class="palette-item-icon bg-class">
+                        <i class="fa-solid fa-cube"></i>
+                    </div>
+                    <div class="palette-item-info">
+                        <div class="palette-item-name">Class Standar</div>
+                        <div class="palette-item-desc">Entitas kelas reguler dengan atribut & metode</div>
+                    </div>
+                    <button type="button" class="btn-palette-add" title="Tambah Langsung ke Tengah Lembar Kerja">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+
+                <div class="palette-item-card" draggable="true" data-type="interface" title="Tarik atau klik untuk menambah Interface">
+                    <div class="palette-item-icon bg-interface">
+                        <i class="fa-solid fa-circle-nodes"></i>
+                    </div>
+                    <div class="palette-item-info">
+                        <div class="palette-item-name">&lt;&lt;interface&gt;&gt;</div>
+                        <div class="palette-item-desc">Kontrak antarmuka metode tanpa implementasi</div>
+                    </div>
+                    <button type="button" class="btn-palette-add" title="Tambah Langsung ke Tengah Lembar Kerja">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+
+                <div class="palette-item-card" draggable="true" data-type="abstract" title="Tarik atau klik untuk menambah Abstract Class">
+                    <div class="palette-item-icon bg-abstract">
+                        <i class="fa-solid fa-diagram-nested"></i>
+                    </div>
+                    <div class="palette-item-info">
+                        <div class="palette-item-name">&lt;&lt;abstract&gt;&gt;</div>
+                        <div class="palette-item-desc">Kelas abstrak sebagai cetak biru pewarisan</div>
+                    </div>
+                    <button type="button" class="btn-palette-add" title="Tambah Langsung ke Tengah Lembar Kerja">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+
+                <div class="palette-item-card" draggable="true" data-type="enum" title="Tarik atau klik untuk menambah Enumerasi">
+                    <div class="palette-item-icon bg-enum">
+                        <i class="fa-solid fa-list-check"></i>
+                    </div>
+                    <div class="palette-item-info">
+                        <div class="palette-item-name">&lt;&lt;enum&gt;&gt;</div>
+                        <div class="palette-item-desc">Daftar nilai konstanta terdefinisi</div>
+                    </div>
+                    <button type="button" class="btn-palette-add" title="Tambah Langsung ke Tengah Lembar Kerja">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="palette-drawer-footer">
+                <div class="palette-tip">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <span>Klik ganda teks kelas, atribut, atau metode untuk mengedit langsung. Tombol <b>+</b> di kanan bawah baris kartu untuk tambah baris baru.</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Collapsible Code Editor Drawer (Bisa Dibuka Lewat Tombol Kode di Toolbar) -->
+        <aside class="diagram-editor-drawer is-closed" id="diagramEditorDrawer">
             <div class="editor-drawer-header">
                 <div class="drawer-title">
                     <i class="fa-solid fa-terminal"></i>
@@ -561,13 +662,132 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Tombol editor aktif secara default di desktop
-    if (window.innerWidth > 992) {
-        btnToggleEditor.classList.add('active');
-    }
-
     btnToggleEditor.addEventListener('click', () => toggleEditor());
     btnCloseDrawer.addEventListener('click', () => toggleEditor(false));
+
+    // ==========================================
+    // PALET KOMPONEN KELAS & DRAG-AND-DROP
+    // ==========================================
+    const paletteDrawer = document.getElementById('diagramPaletteDrawer');
+    const btnTogglePalette = document.getElementById('btnTogglePalette');
+    const btnCollapsePalette = document.getElementById('btnCollapsePalette');
+
+    function togglePalette(forceState) {
+        if (!paletteDrawer) return;
+        const willCollapse = (typeof forceState === 'boolean') ? !forceState : !paletteDrawer.classList.contains('is-collapsed');
+        paletteDrawer.classList.toggle('is-collapsed', willCollapse);
+        if (btnTogglePalette) btnTogglePalette.classList.toggle('active', !willCollapse);
+    }
+
+    if (btnTogglePalette) btnTogglePalette.addEventListener('click', () => togglePalette());
+    if (btnCollapsePalette) btnCollapsePalette.addEventListener('click', () => togglePalette(false));
+
+    // Drag-and-drop & Klik dari palet untuk menambah kelas ke kanvas
+    document.querySelectorAll('.palette-item-card').forEach(item => {
+        const type = item.getAttribute('data-type') || 'class';
+
+        // Klik tombol + atau kartu untuk langsung membuat di tengah layar kanvas
+        item.addEventListener('click', (e) => {
+            canvas.addClass(type);
+            showToast(`Kelas ${type} berhasil ditambahkan.`);
+        });
+
+        // Drag start: simpan tipe kelas di dataTransfer
+        item.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', type);
+            e.dataTransfer.effectAllowed = 'copy';
+        });
+    });
+
+    // Drop target pada area kanvas
+    if (canvasArea) {
+        canvasArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+        });
+
+        canvasArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const type = e.dataTransfer.getData('text/plain');
+            if (!type) return;
+
+            const rect = canvasArea.getBoundingClientRect();
+            const state = canvas.getState();
+            const dropX = Math.round((e.clientX - rect.left - state.panX) / state.zoom - 130);
+            const dropY = Math.round((e.clientY - rect.top - state.panY) / state.zoom - 80);
+
+            canvas.addClass(type, null, dropX, dropY);
+            showToast(`Kelas ${type} berhasil ditambahkan di posisi kursor.`);
+        });
+    }
+
+    // ==========================================
+    // FITUR LOCK POSITION (KUNCI POSISI KARTU)
+    // ==========================================
+    const btnToggleLock = document.getElementById('btnToggleLock');
+    const iconLock = document.getElementById('iconLock');
+    const labelLock = document.getElementById('labelLock');
+
+    function updateLockUI(isLocked) {
+        if (btnToggleLock) {
+            btnToggleLock.classList.toggle('active', isLocked);
+            btnToggleLock.title = isLocked ? 'Posisi kartu terkunci (Klik untuk membuka)' : 'Posisi kartu bebas (Klik untuk mengunci)';
+        }
+        if (iconLock) {
+            iconLock.className = isLocked ? 'fa-solid fa-lock' : 'fa-solid fa-lock-open';
+        }
+        if (labelLock) {
+            labelLock.textContent = isLocked ? 'Terkunci' : 'Bebas';
+        }
+    }
+
+    if (btnToggleLock) {
+        btnToggleLock.addEventListener('click', () => {
+            const locked = canvas.toggleLock();
+            updateLockUI(locked);
+            showToast(locked ? 'Posisi kartu berhasil dikunci.' : 'Posisi kartu dapat digeser.');
+        });
+    }
+
+    // ==========================================
+    // SINKRONISASI KANVAS KE KODE & DATABASE
+    // ==========================================
+    canvas.onCodeChange((newCode) => {
+        if (codeInput) codeInput.value = newCode;
+        if (currentDiagramId) {
+            updateSaveStatus('saving', 'Menyimpan perubahan...');
+            clearTimeout(autoSaveTimer);
+            autoSaveTimer = setTimeout(async () => {
+                try {
+                    const thumbData = DiagramExport.generateThumbnail(canvas.getState());
+                    const response = await fetch('<?= base_url('diagram/save') ?>', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            id: currentDiagramId,
+                            title: currentDiagramTitle,
+                            code: newCode,
+                            layout_data: canvas.getState().nodePositions ? Object.fromEntries(canvas.getState().nodePositions) : null,
+                            thumbnail: thumbData
+                        })
+                    });
+                    const res = await response.json();
+                    if (res.success) {
+                        updateSaveStatus('saved', 'Tersimpan');
+                    } else {
+                        updateSaveStatus('unsaved', 'Perubahan belum disimpan');
+                    }
+                } catch (e) {
+                    updateSaveStatus('unsaved', 'Perubahan belum disimpan');
+                }
+            }, 900);
+        } else {
+            updateSaveStatus('unsaved', 'Perubahan belum disimpan');
+        }
+    });
 
     // Kontrol Navigasi Kanvas
     btnAutoFit.addEventListener('click', () => canvas.autoFit());

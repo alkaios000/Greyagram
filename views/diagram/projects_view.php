@@ -56,7 +56,7 @@ function format_time_ago($datetime) {
 
             <?php if (!empty($diagrams)): ?>
                 <?php foreach ($diagrams as $d): ?>
-                    <div class="project-card" data-id="<?= (int)$d['id'] ?>" data-code="<?= htmlspecialchars($d['code'] ?? '', ENT_QUOTES, 'UTF-8') ?>" data-title="<?= htmlspecialchars(strtolower($d['title']), ENT_QUOTES, 'UTF-8') ?>" data-desc="<?= htmlspecialchars(strtolower($d['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                    <div class="project-card" data-id="<?= (int)$d['id'] ?>" data-code="<?= htmlspecialchars($d['code'] ?? '', ENT_QUOTES, 'UTF-8') ?>" data-layout="<?= htmlspecialchars($d['layout_data'] ?? '', ENT_QUOTES, 'UTF-8') ?>" data-title="<?= htmlspecialchars(strtolower($d['title']), ENT_QUOTES, 'UTF-8') ?>" data-desc="<?= htmlspecialchars(strtolower($d['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
                         <!-- Thumbnail Area (Landscape) -->
                         <div class="project-thumb-container">
                             <?php if (!empty($d['thumbnail'])): ?>
@@ -168,6 +168,11 @@ function format_time_ago($datetime) {
     <i class="fa-solid fa-circle-check toast-icon" id="projectToastIcon"></i>
     <span class="toast-message" id="projectToastMessage"></span>
 </div>
+
+<script src="<?= asset_url('js/diagram_parser.js') ?>"></script>
+<script src="<?= asset_url('js/diagram_router.js') ?>"></script>
+<script src="<?= asset_url('js/diagram_layout.js') ?>"></script>
+<script src="<?= asset_url('js/diagram_export.js') ?>"></script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -395,62 +400,91 @@ document.addEventListener('DOMContentLoaded', function () {
     function renderMissingThumbnails() {
         document.querySelectorAll('.project-card[data-code]').forEach(card => {
             const thumbContainer = card.querySelector('.project-thumb-container');
-            if (thumbContainer && !thumbContainer.querySelector('.project-thumb-img')) {
-                const code = card.getAttribute('data-code');
-                const id = card.getAttribute('data-id');
-                if (!code || !code.trim() || !window.DiagramParser || !window.DiagramLayout || !window.DiagramExport) return;
+            if (!thumbContainer || thumbContainer.querySelector('.project-thumb-img')) return;
 
-                try {
-                    const parsed = DiagramParser.parse(code);
-                    if (parsed && parsed.classes && parsed.classes.length > 0) {
-                        const positions = DiagramLayout.computeLayout(parsed.classes, parsed.relations);
-                        const thumbData = DiagramExport.generateThumbnail({
-                            classes: parsed.classes,
-                            relations: parsed.relations,
-                            nodePositions: positions
-                        }, 480, 240);
+            const code = card.getAttribute('data-code');
+            const id = card.getAttribute('data-id');
+            const layoutRaw = card.getAttribute('data-layout');
 
-                        if (thumbData) {
-                            const placeholder = thumbContainer.querySelector('.project-thumb-placeholder');
-                            if (placeholder) placeholder.remove();
+            if (!code || !code.trim() || !window.DiagramParser || !window.DiagramExport) {
+                fallbackPlaceholder(thumbContainer);
+                return;
+            }
 
-                            const img = document.createElement('img');
-                            img.className = 'project-thumb-img';
-                            img.src = thumbData;
-                            img.alt = 'Thumbnail';
-                            thumbContainer.prepend(img);
-
-                            // Simpan thumbnail ke database di latar belakang
-                            fetch('<?= base_url('diagram/save_positions') ?>', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    id: id,
-                                    thumbnail: thumbData,
-                                    layout_data: {
-                                        positions: Object.fromEntries(
-                                            Array.from(positions.entries()).map(([k, v]) => [k, { x: v.x, y: v.y, width: v.width, height: v.height }])
-                                        )
-                                    }
-                                })
-                            }).catch(() => {});
-                        }
-                    }
-                } catch (e) {
-                    console.warn('Gagal merender thumbnail:', e);
+            try {
+                const parsed = DiagramParser.parse(code);
+                if (!parsed || !parsed.classes || parsed.classes.length === 0) {
+                    fallbackPlaceholder(thumbContainer);
+                    return;
                 }
+
+                let positions = null;
+                if (layoutRaw) {
+                    try {
+                        const parsedLayout = JSON.parse(layoutRaw);
+                        const posObj = parsedLayout.positions || parsedLayout;
+                        if (posObj && typeof posObj === 'object') {
+                            positions = new Map();
+                            Object.keys(posObj).forEach(k => positions.set(k, posObj[k]));
+                        }
+                    } catch (err) {}
+                }
+
+                if (!positions && window.DiagramLayout) {
+                    positions = DiagramLayout.computeLayout(parsed.classes, parsed.relations);
+                }
+
+                const thumbData = DiagramExport.generateThumbnail({
+                    classes: parsed.classes,
+                    relations: parsed.relations,
+                    nodePositions: positions
+                }, 480, 240);
+
+                if (thumbData) {
+                    const placeholder = thumbContainer.querySelector('.project-thumb-placeholder');
+                    if (placeholder) placeholder.remove();
+
+                    const img = document.createElement('img');
+                    img.className = 'project-thumb-img';
+                    img.src = thumbData;
+                    img.alt = 'Thumbnail';
+                    thumbContainer.prepend(img);
+
+                    // Simpan thumbnail ke database di latar belakang
+                    fetch('<?= base_url('diagram/save_positions') ?>', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            id: id,
+                            thumbnail: thumbData
+                        })
+                    }).catch(() => {});
+                } else {
+                    fallbackPlaceholder(thumbContainer);
+                }
+            } catch (e) {
+                console.warn('Gagal merender thumbnail:', e);
+                fallbackPlaceholder(thumbContainer);
             }
         });
+    }
+
+    function fallbackPlaceholder(thumbContainer) {
+        const placeholder = thumbContainer.querySelector('.project-thumb-placeholder');
+        if (placeholder) {
+            placeholder.innerHTML = `
+                <div class="placeholder-grid-pattern"></div>
+                <div class="placeholder-icon-wrap" style="color: var(--primary);">
+                    <i class="fa-solid fa-diagram-project"></i>
+                </div>
+                <span class="placeholder-label">Diagram Kelas</span>
+            `;
+        }
     }
 
     renderMissingThumbnails();
 });
 </script>
-
-<script src="<?= base_url('assets/js/diagram_parser.js') ?>"></script>
-<script src="<?= base_url('assets/js/diagram_router.js') ?>"></script>
-<script src="<?= base_url('assets/js/diagram_layout.js') ?>"></script>
-<script src="<?= base_url('assets/js/diagram_export.js') ?>"></script>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>
 

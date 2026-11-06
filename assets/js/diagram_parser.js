@@ -285,8 +285,55 @@ window.DiagramParser = (function () {
         }
     }
 
+    /**
+     * Serialisasi struktur model objek classes & relations kembali ke format kode Mermaid classDiagram
+     * @param {Array} classes 
+     * @param {Array} relations 
+     * @returns {string}
+     */
+    function serialize(classes, relations) {
+        let out = 'classDiagram\n';
+
+        (classes || []).forEach(cls => {
+            out += `    class ${cls.name} {\n`;
+            if (cls.stereotype) {
+                out += `        <<${cls.stereotype}>>\n`;
+            }
+            (cls.attributes || []).forEach(attr => {
+                let vis = attr.icon || (attr.visibility === 'private' ? '-' : attr.visibility === 'protected' ? '#' : attr.visibility === 'package' ? '~' : '+');
+                let txt = (attr.text || attr.name || '').trim();
+                txt = txt.replace(/^[+\-#~]\s*/, '');
+                if (txt) {
+                    out += `        ${vis}${txt}\n`;
+                }
+            });
+            (cls.methods || []).forEach(m => {
+                let vis = m.icon || (m.visibility === 'private' ? '-' : m.visibility === 'protected' ? '#' : m.visibility === 'package' ? '~' : '+');
+                let txt = (m.text || m.name || '').trim();
+                txt = txt.replace(/^[+\-#~]\s*/, '');
+                if (txt) {
+                    if (!txt.includes('(')) txt += '()';
+                    out += `        ${vis}${txt}\n`;
+                }
+            });
+            out += `    }\n`;
+        });
+
+        (relations || []).forEach(rel => {
+            const sym = rel.symbol || '-->';
+            const sCard = rel.sourceCard ? `"${rel.sourceCard}" ` : '';
+            const tCard = rel.targetCard ? `"${rel.targetCard}" ` : '';
+            const lbl = rel.label ? ` : ${rel.label}` : '';
+            out += `    ${rel.source} ${sCard}${sym} ${tCard}${rel.target}${lbl}\n`;
+        });
+
+        return out;
+    }
+
     return {
         parse: parse,
+        parseMember: parseMember,
+        serialize: serialize,
         mapRelationType: mapRelationType
     };
 })();

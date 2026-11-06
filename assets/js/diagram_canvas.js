@@ -19,8 +19,10 @@ window.DiagramCanvas = (function () {
             panStartY: 0,
             activeDragNodeId: null,
             dragOffset: { x: 0, y: 0 },
+            isLocked: false,
             onUpdate: null,
             onPositionChange: null,
+            onCodeChange: null,
             savedLayoutData: null
         };
 
@@ -187,7 +189,10 @@ window.DiagramCanvas = (function () {
         }
 
         /**
-         * Render elemen HTML untuk setiap kelas diagram
+         * Render elemen HTML untuk setiap kelas diagram dengan dukungan interaktif:
+         * - Klik ganda untuk inline edit nama kelas, atribut, dan metode
+         * - Tombol [+] di setiap bagian untuk tambah baris baru secara instan
+         * - Tombol [x] untuk hapus baris atau kelas
          */
         function renderNodeElements() {
             nodesLayerElement.innerHTML = '';
@@ -196,7 +201,7 @@ window.DiagramCanvas = (function () {
                 const pos = state.nodePositions.get(cls.id) || { x: 100, y: 100, width: 260, height: 160 };
 
                 const card = document.createElement('div');
-                card.className = 'diagram-class-card';
+                card.className = 'diagram-class-card' + (state.isLocked ? ' is-locked' : '');
                 card.id = 'node_' + cls.id;
                 card.setAttribute('data-id', cls.id);
                 card.style.left = pos.x + 'px';
@@ -218,14 +223,51 @@ window.DiagramCanvas = (function () {
                 titleRow.className = 'class-title-row';
 
                 const classIcon = document.createElement('i');
-                classIcon.className = 'fa-solid fa-cube class-title-icon';
+                let iconClass = 'fa-solid fa-cube class-title-icon text-primary';
+                if (cls.stereotype === 'interface') iconClass = 'fa-solid fa-plug class-title-icon text-teal';
+                else if (cls.stereotype === 'abstract') iconClass = 'fa-solid fa-shapes class-title-icon text-purple';
+                else if (cls.stereotype === 'enum') iconClass = 'fa-solid fa-list-ol class-title-icon text-emerald';
+                classIcon.className = iconClass;
                 titleRow.appendChild(classIcon);
 
                 const title = document.createElement('span');
                 title.className = 'class-title';
                 title.textContent = cls.name;
+                title.title = 'Klik 2x untuk ubah nama kelas';
+                title.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    makeInlineEditable(title, cls.name, (newName) => {
+                        updateClassName(cls.id, newName);
+                    });
+                });
                 titleRow.appendChild(title);
 
+                // Header Action: Lock Indicator & Delete Button
+                const headerActions = document.createElement('div');
+                headerActions.className = 'class-header-actions';
+
+                if (state.isLocked) {
+                    const lockBadge = document.createElement('span');
+                    lockBadge.className = 'card-lock-badge';
+                    lockBadge.title = 'Posisi terkunci';
+                    lockBadge.innerHTML = '<i class="fa-solid fa-lock"></i>';
+                    headerActions.appendChild(lockBadge);
+                }
+
+                const btnDelClass = document.createElement('button');
+                btnDelClass.type = 'button';
+                btnDelClass.className = 'btn-card-del';
+                btnDelClass.title = 'Hapus Kelas';
+                btnDelClass.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+                btnDelClass.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if (confirm(`Hapus kelas "${cls.name}" beserta relasinya?`)) {
+                        deleteClass(cls.id);
+                    }
+                });
+                headerActions.appendChild(btnDelClass);
+
+                titleRow.appendChild(headerActions);
                 header.appendChild(titleRow);
                 card.appendChild(header);
 
@@ -235,30 +277,61 @@ window.DiagramCanvas = (function () {
 
                 // Bagian Atribut
                 const attrSection = document.createElement('div');
-                attrSection.className = 'class-member-section';
+                attrSection.className = 'class-member-section attr-section';
+
                 if (cls.attributes && cls.attributes.length > 0) {
-                    cls.attributes.forEach(attr => {
+                    cls.attributes.forEach((attr, idx) => {
                         const row = document.createElement('div');
                         row.className = 'member-row member-attribute';
+                        row.setAttribute('data-idx', idx);
 
                         const badge = document.createElement('span');
                         badge.className = 'visibility-badge vis-' + attr.visibility;
-                        badge.textContent = attr.icon;
+                        badge.textContent = attr.icon || '+';
                         row.appendChild(badge);
 
                         const text = document.createElement('span');
                         text.className = 'member-text';
                         text.textContent = attr.text;
+                        text.title = 'Klik 2x untuk edit atribut';
+                        text.addEventListener('dblclick', (e) => {
+                            e.stopPropagation();
+                            makeInlineEditable(text, (attr.icon || '+') + ' ' + attr.text, (newVal) => {
+                                updateMemberText(cls.id, 'attribute', idx, newVal);
+                            });
+                        });
                         row.appendChild(text);
+
+                        const btnDel = document.createElement('button');
+                        btnDel.type = 'button';
+                        btnDel.className = 'btn-row-del';
+                        btnDel.title = 'Hapus Atribut';
+                        btnDel.innerHTML = '&times;';
+                        btnDel.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            deleteMember(cls.id, 'attribute', idx);
+                        });
+                        row.appendChild(btnDel);
 
                         attrSection.appendChild(row);
                     });
                 } else {
                     const emptyRow = document.createElement('div');
                     emptyRow.className = 'member-row member-empty';
-                    emptyRow.textContent = '// no attributes';
+                    emptyRow.textContent = '// tidak ada atribut';
                     attrSection.appendChild(emptyRow);
                 }
+
+                // Tombol tambah baris atribut di pojok bawah kanan bagian atribut
+                const addAttrBar = document.createElement('div');
+                addAttrBar.className = 'card-add-row-bar';
+                addAttrBar.innerHTML = `<button type="button" class="btn-card-add-row" title="Tambah Baris Atribut Baru"><i class="fa-solid fa-plus"></i> <span>Atribut</span></button>`;
+                addAttrBar.querySelector('button').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const defaultName = cls.stereotype === 'enum' ? 'STATUS_NEW' : '+string newProperty';
+                    addMember(cls.id, 'attribute', defaultName);
+                });
+                attrSection.appendChild(addAttrBar);
                 body.appendChild(attrSection);
 
                 // Garis pemisah atribut dan metode
@@ -268,30 +341,60 @@ window.DiagramCanvas = (function () {
 
                 // Bagian Metode
                 const methodSection = document.createElement('div');
-                methodSection.className = 'class-member-section';
+                methodSection.className = 'class-member-section method-section';
+
                 if (cls.methods && cls.methods.length > 0) {
-                    cls.methods.forEach(method => {
+                    cls.methods.forEach((method, idx) => {
                         const row = document.createElement('div');
                         row.className = 'member-row member-method';
+                        row.setAttribute('data-idx', idx);
 
                         const badge = document.createElement('span');
                         badge.className = 'visibility-badge vis-' + method.visibility;
-                        badge.textContent = method.icon;
+                        badge.textContent = method.icon || '+';
                         row.appendChild(badge);
 
                         const text = document.createElement('span');
                         text.className = 'member-text';
                         text.textContent = method.text;
+                        text.title = 'Klik 2x untuk edit method';
+                        text.addEventListener('dblclick', (e) => {
+                            e.stopPropagation();
+                            makeInlineEditable(text, (method.icon || '+') + ' ' + method.text, (newVal) => {
+                                updateMemberText(cls.id, 'method', idx, newVal);
+                            });
+                        });
                         row.appendChild(text);
+
+                        const btnDel = document.createElement('button');
+                        btnDel.type = 'button';
+                        btnDel.className = 'btn-row-del';
+                        btnDel.title = 'Hapus Method';
+                        btnDel.innerHTML = '&times;';
+                        btnDel.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            deleteMember(cls.id, 'method', idx);
+                        });
+                        row.appendChild(btnDel);
 
                         methodSection.appendChild(row);
                     });
                 } else {
                     const emptyRow = document.createElement('div');
                     emptyRow.className = 'member-row member-empty';
-                    emptyRow.textContent = '// no methods';
+                    emptyRow.textContent = '// tidak ada method';
                     methodSection.appendChild(emptyRow);
                 }
+
+                // Tombol tambah baris method di pojok bawah kanan bagian method
+                const addMethodBar = document.createElement('div');
+                addMethodBar.className = 'card-add-row-bar';
+                addMethodBar.innerHTML = `<button type="button" class="btn-card-add-row" title="Tambah Baris Method Baru"><i class="fa-solid fa-plus"></i> <span>Method</span></button>`;
+                addMethodBar.querySelector('button').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    addMember(cls.id, 'method', '+newAction()');
+                });
+                methodSection.appendChild(addMethodBar);
                 body.appendChild(methodSection);
 
                 card.appendChild(body);
@@ -306,6 +409,51 @@ window.DiagramCanvas = (function () {
                 const measuredW = card.offsetWidth || card.clientWidth;
                 if (measuredH > 0) pos.height = measuredH;
                 if (measuredW > 0) pos.width = measuredW;
+            });
+        }
+
+        /**
+         * Mengubah teks menjadi input inline yang dapat diedit langsung di kanvas
+         */
+        function makeInlineEditable(element, initialValue, onSave) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'card-inline-input';
+            input.value = initialValue;
+
+            const originalParent = element.parentNode;
+            originalParent.replaceChild(input, element);
+            input.focus();
+            input.select();
+
+            let finished = false;
+            const commit = () => {
+                if (finished) return;
+                finished = true;
+                const val = input.value.trim();
+                if (val && val !== initialValue) {
+                    onSave(val);
+                } else {
+                    if (input.parentNode) {
+                        originalParent.replaceChild(element, input);
+                    }
+                }
+            };
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    commit();
+                } else if (e.key === 'Escape') {
+                    finished = true;
+                    if (input.parentNode) {
+                        originalParent.replaceChild(element, input);
+                    }
+                }
+            });
+
+            input.addEventListener('blur', () => {
+                commit();
             });
         }
 
@@ -569,6 +717,10 @@ window.DiagramCanvas = (function () {
             targetHandle.addEventListener('mousedown', (e) => {
                 // Hanya tangani klik kiri
                 if (e.button !== 0) return;
+                // Cegah pergeseran jika mode Lock Position aktif
+                if (state.isLocked) return;
+                // Cegah pergeseran jika user mengklik tombol atau inline editor
+                if (e.target.closest('button, input, textarea, .btn-card-add-row, .btn-row-del, .btn-card-del, .card-inline-input')) return;
                 e.stopPropagation();
 
                 state.activeDragNodeId = nodeId;
@@ -725,31 +877,46 @@ window.DiagramCanvas = (function () {
                 const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
                 g.setAttribute('class', 'relation-label-group');
 
+                const labelStr = String(rel.label);
+                const initW = Math.max(28, labelStr.length * 7.5 + 16);
+                const initH = 20;
+
+                // Background pill agar teks tidak pernah tertutup atau terpotong garis (solid white, border, drop-shadow)
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('class', 'relation-label-bg');
+                rect.setAttribute('fill', '#ffffff');
+                rect.setAttribute('stroke', '#cbd5e1');
+                rect.setAttribute('stroke-width', '1');
+                rect.setAttribute('rx', '4');
+                rect.setAttribute('ry', '4');
+                rect.setAttribute('x', midX - initW / 2);
+                rect.setAttribute('y', midY - initH / 2);
+                rect.setAttribute('width', initW);
+                rect.setAttribute('height', initH);
+
                 const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                 text.setAttribute('x', midX);
                 text.setAttribute('y', midY);
                 text.setAttribute('text-anchor', 'middle');
-                text.setAttribute('dominant-baseline', 'middle');
+                text.setAttribute('dominant-baseline', 'central');
                 text.setAttribute('class', 'relation-label-text');
-                text.textContent = rel.label;
-
-                // Background pill agar teks tidak tertutup garis
-                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                rect.setAttribute('class', 'relation-label-bg');
-                rect.setAttribute('rx', '4');
-                rect.setAttribute('ry', '4');
+                text.textContent = labelStr;
 
                 g.appendChild(rect);
                 g.appendChild(text);
                 labelsLayer.appendChild(g);
 
-                // Sesuaikan ukuran rect dengan panjang teks
+                // Sesuaikan ukuran rect secara akurat setelah render di browser
                 requestAnimationFrame(() => {
-                    const bbox = text.getBBox();
-                    rect.setAttribute('x', bbox.x - 7);
-                    rect.setAttribute('y', bbox.y - 3);
-                    rect.setAttribute('width', bbox.width + 14);
-                    rect.setAttribute('height', bbox.height + 6);
+                    try {
+                        const bbox = text.getBBox();
+                        if (bbox && bbox.width > 0) {
+                            rect.setAttribute('x', bbox.x - 7);
+                            rect.setAttribute('y', bbox.y - 3);
+                            rect.setAttribute('width', bbox.width + 14);
+                            rect.setAttribute('height', bbox.height + 6);
+                        }
+                    } catch (e) {}
                 });
             }
 
@@ -774,25 +941,36 @@ window.DiagramCanvas = (function () {
             // Geser ke samping garis dan beri clearance aman agar teks tidak bertabrakan dengan panah/border
             if (side === 'top') {
                 posX += 14;
-                posY -= isTarget ? 20 : 12;
+                posY -= isTarget ? 22 : 16;
             } else if (side === 'bottom') {
                 posX += 14;
-                posY += isTarget ? 20 : 12;
+                posY += isTarget ? 22 : 16;
             } else if (side === 'left') {
-                posX -= isTarget ? 22 : 14;
-                posY -= 12;
+                posX -= isTarget ? 24 : 16;
+                posY -= 14;
             } else if (side === 'right') {
-                posX += isTarget ? 22 : 14;
-                posY -= 12;
+                posX += isTarget ? 24 : 16;
+                posY -= 14;
             }
 
             const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             g.setAttribute('class', 'cardinality-badge-group');
 
+            const textStr = String(text);
+            const initW = Math.max(18, textStr.length * 7 + 10);
+            const initH = 16;
+
             const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             rect.setAttribute('class', 'cardinality-badge-bg');
+            rect.setAttribute('fill', '#ffffff');
+            rect.setAttribute('stroke', '#cbd5e1');
+            rect.setAttribute('stroke-width', '1');
             rect.setAttribute('rx', '3');
             rect.setAttribute('ry', '3');
+            rect.setAttribute('x', posX - initW / 2);
+            rect.setAttribute('y', posY - initH / 2);
+            rect.setAttribute('width', initW);
+            rect.setAttribute('height', initH);
 
             const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             t.setAttribute('x', posX);
@@ -800,20 +978,24 @@ window.DiagramCanvas = (function () {
             t.setAttribute('text-anchor', 'middle');
             t.setAttribute('dominant-baseline', 'central');
             t.setAttribute('class', 'cardinality-badge-text');
-            t.textContent = text;
+            t.textContent = textStr;
 
             g.appendChild(rect);
             g.appendChild(t);
             labelsLayer.appendChild(g);
 
             requestAnimationFrame(() => {
-                const bbox = t.getBBox();
-                const padX = 5;
-                const padY = 2;
-                rect.setAttribute('x', bbox.x - padX);
-                rect.setAttribute('y', bbox.y - padY);
-                rect.setAttribute('width', Math.max(16, bbox.width + padX * 2));
-                rect.setAttribute('height', Math.max(16, bbox.height + padY * 2));
+                try {
+                    const bbox = t.getBBox();
+                    if (bbox && bbox.width > 0) {
+                        const padX = 5;
+                        const padY = 2;
+                        rect.setAttribute('x', bbox.x - padX);
+                        rect.setAttribute('y', bbox.y - padY);
+                        rect.setAttribute('width', Math.max(18, bbox.width + padX * 2));
+                        rect.setAttribute('height', Math.max(16, bbox.height + padY * 2));
+                    }
+                } catch (e) {}
             });
         }
 
@@ -1033,6 +1215,234 @@ window.DiagramCanvas = (function () {
             }
         }
 
+        /**
+         * Sinkronkan perubahan struktur kanvas ke kode Mermaid dan picu event onCodeChange
+         */
+        function syncToCode() {
+            if (window.DiagramParser && typeof window.DiagramParser.serialize === 'function') {
+                const newCode = DiagramParser.serialize(state.classes, state.relations);
+                if (typeof state.onCodeChange === 'function') {
+                    state.onCodeChange(newCode);
+                }
+            }
+            if (typeof state.onUpdate === 'function') {
+                state.onUpdate(getStats());
+            }
+        }
+
+        /**
+         * Tambah kelas baru secara manual (drag & drop dari palet atau klik tombol)
+         */
+        function addClass(stereotype = 'class', customName = null, worldX = null, worldY = null) {
+            let baseName = stereotype === 'interface' ? 'IService' : (stereotype === 'abstract' ? 'AbstractBase' : (stereotype === 'enum' ? 'StatusType' : 'NewEntity'));
+            let name = customName;
+            if (!name) {
+                let counter = 1;
+                while (state.classes.some(c => c.name.toLowerCase() === (baseName + counter).toLowerCase())) {
+                    counter++;
+                }
+                name = baseName + counter;
+            }
+
+            // Koordinat default jika tidak dispesifikasikan (di tengah layar saat ini)
+            let posX = worldX;
+            let posY = worldY;
+            if (posX === null || posY === null) {
+                const containerW = containerElement.clientWidth || 800;
+                const containerH = containerElement.clientHeight || 600;
+                posX = Math.round((containerW / 2 - state.panX) / state.zoom - 130);
+                posY = Math.round((containerH / 2 - state.panY) / state.zoom - 80);
+            }
+
+            const st = (stereotype === 'class' ? null : stereotype);
+            const defaultAttrs = [];
+            const defaultMethods = [];
+
+            if (st === 'enum') {
+                defaultAttrs.push({ type: 'attribute', visibility: 'public', icon: '+', text: 'ACTIVE' });
+                defaultAttrs.push({ type: 'attribute', visibility: 'public', icon: '+', text: 'INACTIVE' });
+                defaultAttrs.push({ type: 'attribute', visibility: 'public', icon: '+', text: 'PENDING' });
+            } else if (st === 'interface') {
+                defaultMethods.push({ type: 'method', visibility: 'public', icon: '+', text: 'execute()' });
+                defaultMethods.push({ type: 'method', visibility: 'public', icon: '+', text: 'validate()' });
+            } else if (st === 'abstract') {
+                defaultAttrs.push({ type: 'attribute', visibility: 'protected', icon: '#', text: 'int id' });
+                defaultMethods.push({ type: 'method', visibility: 'public', icon: '+', text: 'init()' });
+            } else {
+                defaultAttrs.push({ type: 'attribute', visibility: 'public', icon: '+', text: 'int id' });
+                defaultAttrs.push({ type: 'attribute', visibility: 'public', icon: '+', text: 'string name' });
+                defaultMethods.push({ type: 'method', visibility: 'public', icon: '+', text: 'save()' });
+            }
+
+            const newCls = {
+                id: name,
+                name: name,
+                stereotype: st,
+                attributes: defaultAttrs,
+                methods: defaultMethods
+            };
+
+            state.classes.push(newCls);
+            state.nodePositions.set(name, {
+                x: posX,
+                y: posY,
+                width: 260,
+                height: 160
+            });
+
+            syncToCode();
+            renderNodeElements();
+            measureActualNodeDimensions(false);
+            updateConnectors();
+
+            return newCls;
+        }
+
+        /**
+         * Tambah member (atribut atau method) ke kelas tertentu
+         */
+        function addMember(classId, type, text) {
+            const cls = state.classes.find(c => c.id === classId || c.name === classId);
+            if (!cls) return;
+
+            let parsed = null;
+            if (window.DiagramParser && typeof window.DiagramParser.parseMember === 'function') {
+                parsed = DiagramParser.parseMember(text);
+            }
+            if (!parsed) {
+                parsed = {
+                    type: type,
+                    visibility: 'public',
+                    icon: '+',
+                    text: text.replace(/^[+\-#~]\s*/, '')
+                };
+            }
+
+            if (type === 'attribute') {
+                cls.attributes.push(parsed);
+            } else {
+                cls.methods.push(parsed);
+            }
+
+            syncToCode();
+            renderNodeElements();
+            measureActualNodeDimensions(false);
+            updateConnectors();
+        }
+
+        /**
+         * Hapus baris member pada kelas
+         */
+        function deleteMember(classId, type, index) {
+            const cls = state.classes.find(c => c.id === classId || c.name === classId);
+            if (!cls) return;
+
+            if (type === 'attribute') {
+                if (cls.attributes[index]) cls.attributes.splice(index, 1);
+            } else {
+                if (cls.methods[index]) cls.methods.splice(index, 1);
+            }
+
+            syncToCode();
+            renderNodeElements();
+            measureActualNodeDimensions(false);
+            updateConnectors();
+        }
+
+        /**
+         * Hapus kelas beserta relasi yang terhubung
+         */
+        function deleteClass(classId) {
+            state.classes = state.classes.filter(c => c.id !== classId && c.name !== classId);
+            state.relations = state.relations.filter(r => r.source !== classId && r.target !== classId);
+            state.nodePositions.delete(classId);
+
+            syncToCode();
+            renderNodeElements();
+            measureActualNodeDimensions(false);
+            updateConnectors();
+        }
+
+        /**
+         * Perbarui nama kelas
+         */
+        function updateClassName(classId, newName) {
+            const clean = newName.replace(/[^a-zA-Z0-9_\-]/g, '').trim();
+            if (!clean) return;
+
+            const cls = state.classes.find(c => c.id === classId || c.name === classId);
+            if (!cls) return;
+
+            const oldId = cls.id;
+            cls.id = clean;
+            cls.name = clean;
+
+            if (state.nodePositions.has(oldId)) {
+                const oldPos = state.nodePositions.get(oldId);
+                state.nodePositions.delete(oldId);
+                state.nodePositions.set(clean, oldPos);
+            }
+
+            state.relations.forEach(r => {
+                if (r.source === oldId) r.source = clean;
+                if (r.target === oldId) r.target = clean;
+            });
+
+            syncToCode();
+            renderNodeElements();
+            measureActualNodeDimensions(false);
+            updateConnectors();
+        }
+
+        /**
+         * Perbarui teks atribut atau method secara inline
+         */
+        function updateMemberText(classId, type, index, newText) {
+            const cls = state.classes.find(c => c.id === classId || c.name === classId);
+            if (!cls) return;
+
+            const targetArray = type === 'attribute' ? cls.attributes : cls.methods;
+            if (!targetArray[index]) return;
+
+            let parsed = null;
+            if (window.DiagramParser && typeof window.DiagramParser.parseMember === 'function') {
+                parsed = DiagramParser.parseMember(newText);
+            }
+
+            if (parsed) {
+                targetArray[index] = parsed;
+            } else {
+                targetArray[index].text = newText;
+            }
+
+            syncToCode();
+            renderNodeElements();
+            measureActualNodeDimensions(false);
+            updateConnectors();
+        }
+
+        /**
+         * Atur mode Lock Position (Kunci Posisi Kartu)
+         */
+        function setLocked(locked) {
+            state.isLocked = !!locked;
+            const viewport = containerElement.querySelector('.diagram-viewport');
+            if (viewport) {
+                if (state.isLocked) viewport.classList.add('canvas-locked');
+                else viewport.classList.remove('canvas-locked');
+            }
+            renderNodeElements();
+            return state.isLocked;
+        }
+
+        function toggleLock() {
+            return setLocked(!state.isLocked);
+        }
+
+        function isLocked() {
+            return !!state.isLocked;
+        }
+
         return {
             render: render,
             autoFit: autoFit,
@@ -1044,6 +1454,16 @@ window.DiagramCanvas = (function () {
             getStats: getStats,
             getLayoutData: getLayoutData,
             setLayoutData: setLayoutData,
+            addClass: addClass,
+            addMember: addMember,
+            deleteMember: deleteMember,
+            deleteClass: deleteClass,
+            updateClassName: updateClassName,
+            updateMemberText: updateMemberText,
+            setLocked: setLocked,
+            toggleLock: toggleLock,
+            isLocked: isLocked,
+            onCodeChange: (cb) => { state.onCodeChange = cb; },
             onPositionChange: (cb) => { state.onPositionChange = cb; },
             onUpdate: (cb) => { state.onUpdate = cb; },
             getState: () => state

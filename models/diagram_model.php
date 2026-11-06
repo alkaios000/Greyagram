@@ -115,18 +115,26 @@ class DiagramModel
     /**
      * Simpan cepat posisi kartu dan thumbnail tanpa mengubah judul / kode
      */
-    public function updateLayout(int $id, int $userId, string $layoutData, ?string $thumbnail = null): bool
+    public function updateLayout(int $id, int $userId, ?string $layoutData = null, ?string $thumbnail = null): bool
     {
-        $fields = ["layout_data = :layout_data", "updated_at = NOW()"];
+        $fields = ["updated_at = NOW()"];
         $params = [
-            'id'          => $id,
-            'user_id'     => $userId,
-            'layout_data' => $layoutData
+            'id'      => $id,
+            'user_id' => $userId
         ];
+
+        if ($layoutData !== null) {
+            $fields[] = "layout_data = :layout_data";
+            $params['layout_data'] = $layoutData;
+        }
 
         if ($thumbnail !== null) {
             $fields[] = "thumbnail = :thumbnail";
             $params['thumbnail'] = $thumbnail;
+        }
+
+        if (count($fields) === 1) {
+            return false;
         }
 
         $sql = "UPDATE diagrams SET " . implode(', ', $fields) . " WHERE id = :id AND user_id = :user_id";

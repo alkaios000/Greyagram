@@ -592,14 +592,26 @@ window.DiagramExport = (function () {
      * @param {number} maxThumbHeight
      * @returns {string|null} Data URL citra pratinjau
      */
-    function generateThumbnail(canvasState, maxThumbWidth = 480, maxThumbHeight = 300) {
+    /**
+     * Hasilkan Thumbnail diagram format JPEG data URL untuk preview kartu proyek
+     */
+    function generateThumbnail(canvasState, maxThumbWidth = 480, maxThumbHeight = 240) {
         try {
+            if (!canvasState) return null;
+
             const classes = canvasState.classes || [];
             const relations = canvasState.relations || [];
-            const positions = canvasState.nodePositions;
+            let positions = canvasState.nodePositions;
 
             if (classes.length === 0 || !positions) {
                 return null;
+            }
+
+            // Normalisasi nodePositions jika berupa Object biasa
+            if (!(positions instanceof Map)) {
+                const map = new Map();
+                Object.keys(positions).forEach(k => map.set(k, positions[k]));
+                positions = map;
             }
 
             // Hitung bounding box diagram
@@ -616,20 +628,23 @@ window.DiagramExport = (function () {
 
             if (minX === Infinity || maxX === -Infinity) return null;
 
-            const padding = 40;
-            const diagramWidth = Math.max(300, (maxX - minX) + padding * 2);
-            const diagramHeight = Math.max(200, (maxY - minY) + padding * 2);
+            const padding = 25;
+            const diagramWidth = Math.max(260, (maxX - minX) + padding * 2);
+            const diagramHeight = Math.max(160, (maxY - minY) + padding * 2);
 
-            // Hitung rasio skala agar pas dalam dimensi thumbnail
+            // Hitung rasio skala agar pas proporsional dalam dimensi thumbnail landscape
             const scale = Math.min(maxThumbWidth / diagramWidth, maxThumbHeight / diagramHeight, 1.0);
             const targetW = Math.max(160, Math.round(diagramWidth * scale));
-            const targetH = Math.max(120, Math.round(diagramHeight * scale));
+            const targetH = Math.max(100, Math.round(diagramHeight * scale));
 
             const canvas = document.createElement('canvas');
             canvas.width = targetW;
             canvas.height = targetH;
 
             const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(0, 0, targetW, targetH);
 
@@ -639,25 +654,15 @@ window.DiagramExport = (function () {
             const offsetX = -minX + padding;
             const offsetY = -minY + padding;
 
-            // Gambar relasi konektor
-            if (window.DiagramRouter && relations.length > 0) {
-                const routes = DiagramRouter.calculateRoutes(relations, positions);
-                routes.forEach(route => {
-                    drawConnectorOnCanvas(ctx, route, offsetX, offsetY);
-                });
-            }
+            // 1. Render seluruh relasi konektor ortogonal
+            renderRelationsToCanvas(ctx, relations, positions, offsetX, offsetY);
 
-            // Gambar kartu kelas
-            classes.forEach(cls => {
-                const pos = positions.get(cls.id);
-                if (pos) {
-                    drawClassCardOnCanvas(ctx, cls, pos.x + offsetX, pos.y + offsetY, pos.width, pos.height);
-                }
-            });
+            // 2. Render seluruh kartu kelas
+            renderNodesToCanvas(ctx, classes, positions, offsetX, offsetY);
 
             ctx.restore();
 
-            return canvas.toDataURL('image/jpeg', 0.82);
+            return canvas.toDataURL('image/jpeg', 0.85);
         } catch (e) {
             console.warn('Gagal menghasilkan thumbnail diagram:', e);
             return null;

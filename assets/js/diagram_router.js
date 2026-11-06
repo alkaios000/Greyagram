@@ -302,10 +302,11 @@ window.DiagramRouter = (function () {
             const obs = obstacles[i];
             if (ignoreIds && ignoreIds.includes(obs.id)) continue;
 
-            const bLeft = obs.x - 8;
-            const bRight = obs.x + obs.width + 8;
-            const bTop = obs.y - 8;
-            const bBottom = obs.y + obs.height + 8;
+            // Clearance margin aman 16px agar garis tidak pernah menempel atau memotong kartu
+            const bLeft = obs.x - 16;
+            const bRight = obs.x + obs.width + 16;
+            const bTop = obs.y - 16;
+            const bBottom = obs.y + obs.height + 16;
 
             if (isHorizontal) {
                 const y = pA.y;
@@ -659,7 +660,7 @@ window.DiagramRouter = (function () {
     }
 
     /**
-     * Hitung titik peletakan label teks yang bebas tabrakan (anti-overlap)
+     * Hitung titik peletakan label teks yang bebas tabrakan (anti-overlap dengan deteksi bounding box)
      */
     function computeNonOverlappingLabelPoint(points, labelText, placedLabels) {
         if (!points || points.length === 0) return { x: 0, y: 0 };
@@ -682,16 +683,23 @@ window.DiagramRouter = (function () {
             }
         }
 
-        // Cek tabrakan dengan label-label yang telah ditempatkan sebelumnya
-        const minDistance = 55;
+        const labelLen = String(labelText).length;
+        const labelHalfW = Math.max(22, (labelLen * 7.5 + 16) / 2);
+        const labelHalfH = 12;
+
         let adjustedPt = { x: bestPt.x, y: bestPt.y };
 
-        for (let attempt = 0; attempt < 4; attempt++) {
+        // Deteksi tabrakan AABB (Axis-Aligned Bounding Box) dengan label lain
+        for (let attempt = 0; attempt < 8; attempt++) {
             let collides = false;
             for (let j = 0; j < placedLabels.length; j++) {
                 const other = placedLabels[j];
-                const dist = Math.hypot(adjustedPt.x - other.x, adjustedPt.y - other.y);
-                if (dist < minDistance) {
+                const otherHalfW = other.halfW || 30;
+                const otherHalfH = other.halfH || 12;
+
+                const overlapX = Math.abs(adjustedPt.x - other.x) < (labelHalfW + otherHalfW + 8);
+                const overlapY = Math.abs(adjustedPt.y - other.y) < (labelHalfH + otherHalfH + 6);
+                if (overlapX && overlapY) {
                     collides = true;
                     break;
                 }
@@ -699,15 +707,22 @@ window.DiagramRouter = (function () {
 
             if (!collides) break;
 
-            // Jika bertabrakan, geser secara staggered di sepanjang segmen
+            // Jika bertabrakan, geser secara staggered di sepanjang jalur
             if (isHorizontal) {
-                adjustedPt.x += (attempt % 2 === 0 ? 35 : -35) * (Math.floor(attempt / 2) + 1);
+                const step = (attempt % 2 === 0 ? 1 : -1) * (Math.floor(attempt / 2) + 1) * (labelHalfW * 1.5 + 10);
+                adjustedPt.x = bestPt.x + Math.round(step);
             } else {
-                adjustedPt.y += (attempt % 2 === 0 ? 25 : -25) * (Math.floor(attempt / 2) + 1);
+                const step = (attempt % 2 === 0 ? 1 : -1) * (Math.floor(attempt / 2) + 1) * 26;
+                adjustedPt.y = bestPt.y + Math.round(step);
             }
         }
 
-        placedLabels.push(adjustedPt);
+        placedLabels.push({
+            x: adjustedPt.x,
+            y: adjustedPt.y,
+            halfW: labelHalfW,
+            halfH: labelHalfH
+        });
         return adjustedPt;
     }
 

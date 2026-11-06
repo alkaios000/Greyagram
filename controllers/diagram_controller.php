@@ -226,11 +226,11 @@ class DiagramController
             : null;
         $thumbnail = isset($input['thumbnail']) ? (string)$input['thumbnail'] : null;
 
-        if (!$diagramId || $layoutData === null) {
+        if (!$diagramId || ($layoutData === null && $thumbnail === null)) {
             http_response_code(400);
             echo json_encode([
                 'success' => false,
-                'message' => 'Parameter ID diagram atau layout_data tidak valid.'
+                'message' => 'Parameter ID diagram, layout_data, atau thumbnail tidak valid.'
             ]);
             return;
         }
