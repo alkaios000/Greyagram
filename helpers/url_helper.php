@@ -31,11 +31,20 @@ if (!function_exists('base_url')) {
 
 if (!function_exists('asset_url')) {
     /**
-     * Dapatkan URL untuk file aset (css, js, img)
+     * Dapatkan URL untuk file aset (css, js, img) dengan cache busting otomatis
      */
     function asset_url(string $path = ''): string
     {
-        return base_url('assets/' . ltrim($path, '/'));
+        $cleanPath = ltrim($path, '/');
+        $fullPath = __DIR__ . '/../assets/' . $cleanPath;
+        $url = base_url('assets/' . $cleanPath);
+
+        if (file_exists($fullPath)) { 
+            $version = filemtime($fullPath);
+            return "{$url}?v={$version}";
+        }
+
+        return $url;
     }
 }
 

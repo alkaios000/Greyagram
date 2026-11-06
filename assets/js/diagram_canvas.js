@@ -646,6 +646,16 @@ window.DiagramCanvas = (function () {
 
             if (!window.DiagramRouter) return;
 
+            // Layer untuk garis konektor
+            const connectorsLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            connectorsLayer.setAttribute('id', 'connectorsLayer');
+            svgElement.appendChild(connectorsLayer);
+
+            // Layer untuk label teks dan badge kardinalitas (selalu di atas garis konektor!)
+            const labelsLayer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            labelsLayer.setAttribute('id', 'labelsLayer');
+            svgElement.appendChild(labelsLayer);
+
             const routes = DiagramRouter.calculateRoutes(state.relations, state.nodePositions);
 
             routes.forEach(route => {
@@ -660,10 +670,10 @@ window.DiagramCanvas = (function () {
                 // Terapkan marker panah/simbol sesuai tipe relasi
                 applyMarkers(path, rel.type);
 
-                svgElement.appendChild(path);
+                connectorsLayer.appendChild(path);
 
-                // Render kardinalitas & label
-                renderRelationLabels(route);
+                // Render kardinalitas & label pada labelsLayer
+                renderRelationLabels(route, labelsLayer);
             });
 
             if (guidesLayer) svgElement.appendChild(guidesLayer);
@@ -703,7 +713,7 @@ window.DiagramCanvas = (function () {
         /**
          * Render teks label relasi dan kardinalitas
          */
-        function renderRelationLabels(route) {
+        function renderRelationLabels(route, labelsLayer) {
             const rel = route.rel;
             const conn = route.connection;
 
@@ -731,66 +741,80 @@ window.DiagramCanvas = (function () {
 
                 g.appendChild(rect);
                 g.appendChild(text);
-                svgElement.appendChild(g);
+                labelsLayer.appendChild(g);
 
                 // Sesuaikan ukuran rect dengan panjang teks
                 requestAnimationFrame(() => {
                     const bbox = text.getBBox();
-                    rect.setAttribute('x', bbox.x - 6);
-                    rect.setAttribute('y', bbox.y - 2);
-                    rect.setAttribute('width', bbox.width + 12);
-                    rect.setAttribute('height', bbox.height + 4);
+                    rect.setAttribute('x', bbox.x - 7);
+                    rect.setAttribute('y', bbox.y - 3);
+                    rect.setAttribute('width', bbox.width + 14);
+                    rect.setAttribute('height', bbox.height + 6);
                 });
             }
 
             // Kardinalitas Sumber (Source Cardinality)
             if (rel.sourceCard && conn.source) {
-                renderCardinalityText(conn.source, conn.sourceSide, rel.sourceCard);
+                renderCardinalityBadge(conn.source, conn.sourceSide, rel.sourceCard, false, labelsLayer);
             }
 
             // Kardinalitas Target (Target Cardinality)
             if (rel.targetCard && conn.target) {
-                renderCardinalityText(conn.target, conn.targetSide, rel.targetCard);
+                renderCardinalityBadge(conn.target, conn.targetSide, rel.targetCard, true, labelsLayer);
             }
         }
 
-        function renderCardinalityText(point, side, text) {
+        /**
+         * Render badge kardinalitas dengan background putih dan border pelindung (anti-tertutup garis)
+         */
+        function renderCardinalityBadge(point, side, text, isTarget, labelsLayer) {
             let posX = point.x;
             let posY = point.y;
-            let anchor = 'start';
 
-            // Geser ke samping garis dan beri clearance agar teks '1' atau 'N' tidak pernah tertutup garis
+            // Geser ke samping garis dan beri clearance aman agar teks tidak bertabrakan dengan panah/border
             if (side === 'top') {
-                posX += 9;
-                posY -= 12;
-                anchor = 'start';
+                posX += 14;
+                posY -= isTarget ? 20 : 12;
             } else if (side === 'bottom') {
-                posX += 9;
-                posY += 14;
-                anchor = 'start';
+                posX += 14;
+                posY += isTarget ? 20 : 12;
             } else if (side === 'left') {
-                posX -= 10;
-                posY -= 9;
-                anchor = 'end';
+                posX -= isTarget ? 22 : 14;
+                posY -= 12;
             } else if (side === 'right') {
-                posX += 10;
-                posY -= 9;
-                anchor = 'start';
+                posX += isTarget ? 22 : 14;
+                posY -= 12;
             }
 
             const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            g.setAttribute('class', 'cardinality-group');
+            g.setAttribute('class', 'cardinality-badge-group');
+
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('class', 'cardinality-badge-bg');
+            rect.setAttribute('rx', '3');
+            rect.setAttribute('ry', '3');
 
             const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             t.setAttribute('x', posX);
             t.setAttribute('y', posY);
-            t.setAttribute('text-anchor', anchor);
-            t.setAttribute('dominant-baseline', 'middle');
-            t.setAttribute('class', 'cardinality-text');
+            t.setAttribute('text-anchor', 'middle');
+            t.setAttribute('dominant-baseline', 'central');
+            t.setAttribute('class', 'cardinality-badge-text');
             t.textContent = text;
 
+            g.appendChild(rect);
             g.appendChild(t);
-            svgElement.appendChild(g);
+            labelsLayer.appendChild(g);
+
+            requestAnimationFrame(() => {
+                const bbox = t.getBBox();
+                const padX = 5;
+                const padY = 2;
+                rect.setAttribute('x', bbox.x - padX);
+                rect.setAttribute('y', bbox.y - padY);
+                rect.setAttribute('width', Math.max(16, bbox.width + padX * 2));
+                rect.setAttribute('height', Math.max(16, bbox.height + padY * 2));
+            });
         }
 
         /**

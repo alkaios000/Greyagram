@@ -22,7 +22,7 @@ class DiagramModel
     public function getByUser(int $userId): array
     {
         $stmt = $this->db->prepare("
-            SELECT id, user_id, title, description, type, thumbnail, layout_data, created_at, updated_at,
+            SELECT id, user_id, title, description, type, code, thumbnail, layout_data, created_at, updated_at,
                    LENGTH(code) AS code_size
             FROM diagrams 
             WHERE user_id = :user_id 

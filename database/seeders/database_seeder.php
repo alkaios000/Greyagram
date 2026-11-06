@@ -89,7 +89,7 @@ return [
                 'title'       => 'E-Commerce Architecture Diagram',
                 'description' => 'Diagram kelas relasi e-commerce utama',
                 'code'        => $ecommerceCode
-            ]);
+            ]); 
             echo " - Tabel 'diagrams' berhasil di-seed (1 diagram contoh)\n";
         }
 
@@ -112,7 +112,7 @@ return [
             ]);
             echo " - Tabel 'activities' berhasil di-seed\n";
         }
-
+        
         echo "Seeding selesai dengan sukses!\n";
     }
 ];

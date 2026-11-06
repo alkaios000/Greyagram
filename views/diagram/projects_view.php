@@ -43,21 +43,21 @@ function format_time_ago($datetime) {
 
         <!-- Projects Grid -->
         <div class="projects-grid" id="projectsGrid">
-            <!-- Create New Card -->
+            <!-- Create New Card (Compact Landscape) -->
             <a href="<?= base_url('diagram') ?>" class="project-card project-card-new" title="Mulai Lembar Kerja Diagram Baru">
                 <div class="new-card-inner">
                     <div class="new-card-icon">
                         <i class="fa-solid fa-plus"></i>
                     </div>
-                    <h3 class="new-card-title">Buat Diagram Baru</h3>
-                    <p class="new-card-desc">Buka workspace kosong atau pilih dari template kelas arsitektur.</p>
+                    <div class="new-card-title">Buat Diagram Baru</div>
+                    <div class="new-card-desc">Buka kanvas kosong</div>
                 </div>
             </a>
 
             <?php if (!empty($diagrams)): ?>
                 <?php foreach ($diagrams as $d): ?>
-                    <div class="project-card" data-id="<?= (int)$d['id'] ?>" data-title="<?= htmlspecialchars(strtolower($d['title']), ENT_QUOTES, 'UTF-8') ?>" data-desc="<?= htmlspecialchars(strtolower($d['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
-                        <!-- Thumbnail Area -->
+                    <div class="project-card" data-id="<?= (int)$d['id'] ?>" data-code="<?= htmlspecialchars($d['code'] ?? '', ENT_QUOTES, 'UTF-8') ?>" data-title="<?= htmlspecialchars(strtolower($d['title']), ENT_QUOTES, 'UTF-8') ?>" data-desc="<?= htmlspecialchars(strtolower($d['description'] ?? ''), ENT_QUOTES, 'UTF-8') ?>">
+                        <!-- Thumbnail Area (Landscape) -->
                         <div class="project-thumb-container">
                             <?php if (!empty($d['thumbnail'])): ?>
                                 <img src="<?= htmlspecialchars($d['thumbnail'], ENT_QUOTES, 'UTF-8') ?>" class="project-thumb-img" alt="<?= htmlspecialchars($d['title'], ENT_QUOTES, 'UTF-8') ?>" loading="lazy">
@@ -65,61 +65,44 @@ function format_time_ago($datetime) {
                                 <div class="project-thumb-placeholder">
                                     <div class="placeholder-grid-pattern"></div>
                                     <div class="placeholder-icon-wrap">
-                                        <i class="fa-solid fa-diagram-project"></i>
+                                        <i class="fa-solid fa-spinner fa-spin"></i>
                                     </div>
-                                    <span class="placeholder-label">Pratinjau Belum Tersedia</span>
+                                    <span class="placeholder-label">Merender pratinjau...</span>
                                 </div>
                             <?php endif; ?>
 
                             <!-- Hover Overlay -->
                             <div class="project-thumb-overlay">
-                                <a href="<?= base_url('diagram?id=' . (int)$d['id']) ?>" class="btn btn-sm btn-primary">
-                                    <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                                    <span>Buka di Workspace</span>
+                                <a href="<?= base_url('diagram?id=' . (int)$d['id']) ?>" class="btn-thumb-open" title="Buka Workspace">
+                                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Buka
                                 </a>
                             </div>
 
                             <span class="badge-diagram-type"><?= htmlspecialchars(ucfirst($d['type'] ?? 'Class'), ENT_QUOTES, 'UTF-8') ?></span>
                         </div>
 
-                        <!-- Card Body -->
-                        <div class="project-card-body">
+                        <!-- Card Bottom Bar (Title + Meta + Quick Actions) -->
+                        <div class="project-card-info">
                             <h3 class="project-title" title="<?= htmlspecialchars($d['title'], ENT_QUOTES, 'UTF-8') ?>">
                                 <a href="<?= base_url('diagram?id=' . (int)$d['id']) ?>">
                                     <?= htmlspecialchars($d['title'], ENT_QUOTES, 'UTF-8') ?>
                                 </a>
                             </h3>
-                            <p class="project-desc">
-                                <?= !empty($d['description']) ? htmlspecialchars($d['description'], ENT_QUOTES, 'UTF-8') : 'Tidak ada keterangan tambahan.' ?>
-                            </p>
-                            <div class="project-meta">
+                            <div class="project-card-meta-row">
                                 <span class="meta-time" title="Diperbarui: <?= htmlspecialchars($d['updated_at'], ENT_QUOTES, 'UTF-8') ?>">
-                                    <i class="fa-regular fa-clock"></i>
-                                    <span><?= format_time_ago($d['updated_at']) ?></span>
+                                    <i class="fa-regular fa-clock"></i> <?= format_time_ago($d['updated_at']) ?>
                                 </span>
-                                <?php if (!empty($d['layout_data'])): ?>
-                                    <span class="badge-layout-saved" title="Posisi kartu diagram telah disesuaikan manual">
-                                        <i class="fa-solid fa-thumbtack"></i> Posisi Terkunci
-                                    </span>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-
-                        <!-- Card Footer / Actions -->
-                        <div class="project-card-footer">
-                            <a href="<?= base_url('diagram?id=' . (int)$d['id']) ?>" class="btn btn-sm btn-outline btn-action" title="Buka di Workspace">
-                                <i class="fa-solid fa-arrow-up-right-from-square"></i> Buka
-                            </a>
-                            <div class="card-action-group">
-                                <button type="button" class="btn btn-icon btn-sm btn-rename" data-id="<?= (int)$d['id'] ?>" data-title="<?= htmlspecialchars($d['title'], ENT_QUOTES, 'UTF-8') ?>" title="Ganti Nama">
-                                    <i class="fa-solid fa-pen"></i>
-                                </button>
-                                <button type="button" class="btn btn-icon btn-sm btn-duplicate" data-id="<?= (int)$d['id'] ?>" title="Duplikasi Diagram">
-                                    <i class="fa-solid fa-copy"></i>
-                                </button>
-                                <button type="button" class="btn btn-icon btn-sm text-danger btn-delete" data-id="<?= (int)$d['id'] ?>" data-title="<?= htmlspecialchars($d['title'], ENT_QUOTES, 'UTF-8') ?>" title="Hapus Diagram">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
+                                <div class="card-action-group">
+                                    <button type="button" class="btn-mini-action btn-rename" data-id="<?= (int)$d['id'] ?>" data-title="<?= htmlspecialchars($d['title'], ENT_QUOTES, 'UTF-8') ?>" title="Ganti Nama">
+                                        <i class="fa-solid fa-pen"></i>
+                                    </button>
+                                    <button type="button" class="btn-mini-action btn-duplicate" data-id="<?= (int)$d['id'] ?>" title="Duplikasi">
+                                        <i class="fa-solid fa-copy"></i>
+                                    </button>
+                                    <button type="button" class="btn-mini-action text-danger btn-delete" data-id="<?= (int)$d['id'] ?>" data-title="<?= htmlspecialchars($d['title'], ENT_QUOTES, 'UTF-8') ?>" title="Hapus">
+                                        <i class="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -408,8 +391,66 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
+    // Auto-render thumbnail untuk kartu yang belum memiliki pratinjau di database
+    function renderMissingThumbnails() {
+        document.querySelectorAll('.project-card[data-code]').forEach(card => {
+            const thumbContainer = card.querySelector('.project-thumb-container');
+            if (thumbContainer && !thumbContainer.querySelector('.project-thumb-img')) {
+                const code = card.getAttribute('data-code');
+                const id = card.getAttribute('data-id');
+                if (!code || !code.trim() || !window.DiagramParser || !window.DiagramLayout || !window.DiagramExport) return;
+
+                try {
+                    const parsed = DiagramParser.parse(code);
+                    if (parsed && parsed.classes && parsed.classes.length > 0) {
+                        const positions = DiagramLayout.computeLayout(parsed.classes, parsed.relations);
+                        const thumbData = DiagramExport.generateThumbnail({
+                            classes: parsed.classes,
+                            relations: parsed.relations,
+                            nodePositions: positions
+                        }, 480, 240);
+
+                        if (thumbData) {
+                            const placeholder = thumbContainer.querySelector('.project-thumb-placeholder');
+                            if (placeholder) placeholder.remove();
+
+                            const img = document.createElement('img');
+                            img.className = 'project-thumb-img';
+                            img.src = thumbData;
+                            img.alt = 'Thumbnail';
+                            thumbContainer.prepend(img);
+
+                            // Simpan thumbnail ke database di latar belakang
+                            fetch('<?= base_url('diagram/save_positions') ?>', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    id: id,
+                                    thumbnail: thumbData,
+                                    layout_data: {
+                                        positions: Object.fromEntries(
+                                            Array.from(positions.entries()).map(([k, v]) => [k, { x: v.x, y: v.y, width: v.width, height: v.height }])
+                                        )
+                                    }
+                                })
+                            }).catch(() => {});
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Gagal merender thumbnail:', e);
+                }
+            }
+        });
+    }
+
+    renderMissingThumbnails();
 });
 </script>
+
+<script src="<?= base_url('assets/js/diagram_parser.js') ?>"></script>
+<script src="<?= base_url('assets/js/diagram_router.js') ?>"></script>
+<script src="<?= base_url('assets/js/diagram_layout.js') ?>"></script>
+<script src="<?= base_url('assets/js/diagram_export.js') ?>"></script>
 
 <?php require_once __DIR__ . '/../layouts/footer.php'; ?>
 

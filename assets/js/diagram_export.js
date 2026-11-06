@@ -178,10 +178,10 @@ window.DiagramExport = (function () {
 
             // Kardinalitas
             if (rel.sourceCard && conn.source) {
-                drawCardText(ctx, { x: conn.source.x + offsetX, y: conn.source.y + offsetY }, conn.sourceSide, rel.sourceCard);
+                drawCardText(ctx, { x: conn.source.x + offsetX, y: conn.source.y + offsetY }, conn.sourceSide, rel.sourceCard, false);
             }
             if (rel.targetCard && conn.target) {
-                drawCardText(ctx, { x: conn.target.x + offsetX, y: conn.target.y + offsetY }, conn.targetSide, rel.targetCard);
+                drawCardText(ctx, { x: conn.target.x + offsetX, y: conn.target.y + offsetY }, conn.targetSide, rel.targetCard, true);
             }
 
             ctx.restore();
@@ -364,50 +364,51 @@ window.DiagramExport = (function () {
         ctx.restore();
     }
 
-    function drawCardText(ctx, point, side, text) {
+    function drawCardText(ctx, point, side, text, isTarget = false) {
         let tx = point.x;
         let ty = point.y;
-        let align = 'start';
 
         if (side === 'top') {
-            tx += 9;
-            ty -= 12;
-            align = 'start';
+            tx += 14;
+            ty -= isTarget ? 20 : 12;
         } else if (side === 'bottom') {
-            tx += 9;
-            ty += 14;
-            align = 'start';
+            tx += 14;
+            ty += isTarget ? 20 : 12;
         } else if (side === 'left') {
-            tx -= 10;
-            ty -= 9;
-            align = 'end';
+            tx -= isTarget ? 22 : 14;
+            ty -= 12;
         } else if (side === 'right') {
-            tx += 10;
-            ty -= 9;
-            align = 'start';
+            tx += isTarget ? 22 : 14;
+            ty -= 12;
         }
 
         ctx.save();
-        ctx.font = '700 11px Inter, sans-serif';
-        ctx.textAlign = align;
+        ctx.font = '700 10px Inter, sans-serif';
+        const textWidth = ctx.measureText(text).width;
+        const padX = 5;
+        const padY = 3;
+        const badgeWidth = Math.max(16, textWidth + padX * 2);
+        const badgeHeight = 16;
+        const badgeX = tx - badgeWidth / 2;
+        const badgeY = ty - badgeHeight / 2;
+
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1;
+        drawRoundedRect(ctx, badgeX, badgeY, badgeWidth, badgeHeight, 3, true, true);
+
+        ctx.fillStyle = '#1e293b';
+        ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-
-        // Garis keliling (halo) putih tebal agar garis di belakang tidak menembus teks
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 4;
-        ctx.lineJoin = 'round';
-        ctx.strokeText(text, tx, ty);
-
-        ctx.fillStyle = '#1f2937';
         ctx.fillText(text, tx, ty);
         ctx.restore();
     }
 
-    function getCardinalitySvgPos(x, y, side) {
-        if (side === 'top') return { x: x + 9, y: y - 12, anchor: 'start' };
-        if (side === 'bottom') return { x: x + 9, y: y + 14, anchor: 'start' };
-        if (side === 'left') return { x: x - 10, y: y - 9, anchor: 'end' };
-        return { x: x + 10, y: y - 9, anchor: 'start' };
+    function getCardinalitySvgPos(x, y, side, isTarget = false) {
+        if (side === 'top') return { x: x + 14, y: y - (isTarget ? 20 : 12) };
+        if (side === 'bottom') return { x: x + 14, y: y + (isTarget ? 20 : 12) };
+        if (side === 'left') return { x: x - (isTarget ? 22 : 14), y: y - 12 };
+        return { x: x + (isTarget ? 22 : 14), y: y - 12 };
     }
 
     function drawRoundedRect(ctx, x, y, width, height, radius, fill, stroke) {
@@ -522,15 +523,17 @@ window.DiagramExport = (function () {
                 svgContent += `  <g><rect x="${lx - tw/2}" y="${ly - 10}" width="${tw}" height="20" rx="4" fill="#ffffff" stroke="#d1d5db" /><text x="${lx}" y="${ly + 4}" text-anchor="middle" font-size="11" font-weight="500" fill="#4b5563">${rel.label}</text></g>\n`;
             }
 
-            // Kardinalitas Sumber & Target pada SVG
+            // Kardinalitas Sumber & Target pada SVG (dilindungi badge putih anti-tumpuk)
             const conn = route.connection;
             if (rel.sourceCard && conn && conn.source) {
-                const cPos = getCardinalitySvgPos(conn.source.x + offsetX, conn.source.y + offsetY, conn.sourceSide);
-                svgContent += `  <text x="${cPos.x}" y="${cPos.y}" text-anchor="${cPos.anchor}" dominant-baseline="middle" font-size="11" font-weight="700" fill="#1f2937" stroke="#ffffff" stroke-width="3.5" paint-order="stroke fill" stroke-linejoin="round">${rel.sourceCard}</text>\n`;
+                const cPos = getCardinalitySvgPos(conn.source.x + offsetX, conn.source.y + offsetY, conn.sourceSide, false);
+                const tw = Math.max(16, rel.sourceCard.length * 7 + 10);
+                svgContent += `  <g class="cardinality-badge"><rect x="${cPos.x - tw/2}" y="${cPos.y - 8}" width="${tw}" height="16" rx="3" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" /><text x="${cPos.x}" y="${cPos.y}" text-anchor="middle" dominant-baseline="central" font-size="10" font-weight="700" fill="#1e293b">${rel.sourceCard}</text></g>\n`;
             }
             if (rel.targetCard && conn && conn.target) {
-                const cPos = getCardinalitySvgPos(conn.target.x + offsetX, conn.target.y + offsetY, conn.targetSide);
-                svgContent += `  <text x="${cPos.x}" y="${cPos.y}" text-anchor="${cPos.anchor}" dominant-baseline="middle" font-size="11" font-weight="700" fill="#1f2937" stroke="#ffffff" stroke-width="3.5" paint-order="stroke fill" stroke-linejoin="round">${rel.targetCard}</text>\n`;
+                const cPos = getCardinalitySvgPos(conn.target.x + offsetX, conn.target.y + offsetY, conn.targetSide, true);
+                const tw = Math.max(16, rel.targetCard.length * 7 + 10);
+                svgContent += `  <g class="cardinality-badge"><rect x="${cPos.x - tw/2}" y="${cPos.y - 8}" width="${tw}" height="16" rx="3" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" /><text x="${cPos.x}" y="${cPos.y}" text-anchor="middle" dominant-baseline="central" font-size="10" font-weight="700" fill="#1e293b">${rel.targetCard}</text></g>\n`;
             }
         });
 
