@@ -497,18 +497,21 @@
 }
 
 /* ==========================================================================
-   LEFT COMPONENT PALETTE DRAWER (DRAG & DROP)
+   WORKSPACE SIDE DRAWERS: LEFT PALETTE & RIGHT CODE EDITOR
    ========================================================================== */
+
+/* Left Component Palette Drawer */
 .diagram-palette-drawer {
-    width: 215px;
-    min-width: 215px;
+    position: relative;
+    width: 240px;
+    min-width: 200px;
     height: 100%;
     background: #ffffff;
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
     z-index: 20;
-    transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.25s, opacity 0.2s, padding 0.25s;
+    transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.25s, opacity 0.2s;
     overflow: hidden;
     flex-shrink: 0;
 }
@@ -522,170 +525,327 @@
     opacity: 0;
 }
 
-.palette-drawer-header {
-    height: 42px;
+/* Right Mermaid Code Editor Drawer */
+.diagram-editor-drawer {
+    position: relative;
+    width: 360px;
+    min-width: 280px;
+    height: 100%;
+    background: #ffffff;
+    border-left: 1px solid var(--border-color) !important;
+    border-right: none !important;
+    box-shadow: -2px 0 10px rgba(0, 0, 0, 0.03);
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), min-width 0.25s, opacity 0.2s;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.diagram-editor-drawer.is-closed {
+    width: 0 !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    border-left: none !important;
+    pointer-events: none;
+    opacity: 0;
+}
+
+@media (max-width: 992px) {
+    .diagram-editor-drawer {
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: auto;
+        z-index: 35;
+        box-shadow: -4px 0 20px rgba(0, 0, 0, 0.15);
+        transform: translateX(100%);
+        margin-right: 0 !important;
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .diagram-editor-drawer.is-open {
+        transform: translateX(0);
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+/* Resizers for both drawers */
+.drawer-resizer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 6px;
+    cursor: col-resize;
+    z-index: 35;
+    transition: background 0.15s ease;
+}
+
+.drawer-resizer:hover,
+.drawer-resizer.is-resizing {
+    background: #3b82f6;
+}
+
+.drawer-resizer.resizer-right {
+    right: 0;
+}
+
+.drawer-resizer.resizer-left {
+    left: 0;
+}
+
+/* Angle Show / Hide Buttons */
+.drawer-angle-btn {
+    border: none;
+    background: transparent;
+    color: #64748b;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.drawer-angle-btn:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+/* Docking tabs on canvas edges to reopen collapsed drawers */
+.drawer-dock-tab {
+    position: absolute;
+    top: 14px;
+    z-index: 25;
+    width: 28px;
+    height: 38px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.drawer-dock-tab.dock-tab-left {
+    left: 0;
+    border-left: none;
+    border-radius: 0 6px 6px 0;
+}
+
+.drawer-dock-tab.dock-tab-right {
+    right: 0;
+    border-right: none;
+    border-radius: 6px 0 0 6px;
+}
+
+.drawer-dock-tab:hover {
+    background: #3b82f6;
+    color: #ffffff;
+    border-color: #3b82f6;
+    box-shadow: 0 3px 10px rgba(59, 130, 246, 0.25);
+}
+
+/* Drawer Headers */
+.palette-drawer-header,
+.editor-drawer-header {
+    height: 44px;
     padding: 0 0.85rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid #f1f5f9;
     flex-shrink: 0;
+    background: #ffffff;
 }
 
-.palette-header-title {
+.palette-title,
+.drawer-title {
     display: flex;
     align-items: center;
     gap: 0.45rem;
-    font-size: 0.78rem;
+    font-size: 0.82rem;
     font-weight: 700;
     color: #1e293b;
 }
 
-.btn-palette-collapse {
-    border: none;
-    background: transparent;
-    color: #94a3b8;
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 0.75rem;
-}
-
-.btn-palette-collapse:hover {
-    background: #f1f5f9;
-    color: #475569;
-}
-
+/* Palette Drawer Body & Visual Mini-Card Previews */
 .palette-drawer-body {
     flex: 1;
     overflow-y: auto;
     padding: 0.75rem;
     display: flex;
     flex-direction: column;
-    gap: 0.55rem;
+    gap: 0.75rem;
 }
 
-.palette-intro-hint {
+.palette-hint {
     font-size: 0.68rem;
     color: #64748b;
-    margin-bottom: 0.15rem;
+    margin-bottom: 0.1rem;
     line-height: 1.35;
 }
 
-.palette-item-card {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    padding: 0.45rem 0.55rem;
-    background: #f8fafc;
+.palette-preview-card {
+    background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 6px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
     cursor: grab;
     user-select: none;
-    transition: all 0.15s ease;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+    position: relative;
 }
 
-.palette-item-card:hover {
-    background: #ffffff;
+.palette-preview-card:hover {
     border-color: #3b82f6;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
-    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.12);
+    transform: translateY(-2px);
 }
 
-.palette-item-card:active {
+.palette-preview-card:active {
     cursor: grabbing;
 }
 
-.palette-item-card.is-dragging {
+.palette-preview-card.is-dragging {
     opacity: 0.4;
     border-style: dashed;
 }
 
-.palette-item-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 5px;
+.mini-card-header {
+    padding: 6px 8px;
     display: flex;
     align-items: center;
-    justify-content: center;
-    font-size: 0.82rem;
-    flex-shrink: 0;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border-bottom: 1px solid #f1f5f9;
 }
 
-.palette-item-icon.icon-class { background: #eff6ff; color: #3b82f6; }
-.palette-item-icon.icon-interface { background: #f0fdfa; color: #0d9488; }
-.palette-item-icon.icon-abstract { background: #faf5ff; color: #9333ea; }
-.palette-item-icon.icon-enum { background: #ecfdf5; color: #059669; }
+.mini-card-header.header-class {
+    background: #f8fafc;
+    color: #1e293b;
+    border-top: 3px solid #3b82f6;
+}
 
-.palette-item-info {
-    flex: 1;
-    min-width: 0;
+.mini-card-header.header-interface {
+    background: #fdf4ff;
+    color: #7e22ce;
+    border-top: 3px solid #a855f7;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.mini-card-header.header-abstract {
+    background: #fff7ed;
+    color: #c2410c;
+    border-top: 3px solid #f97316;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.mini-card-header.header-enum {
+    background: #f0fdf4;
+    color: #15803d;
+    border-top: 3px solid #22c55e;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.mini-card-title-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.mini-card-stereotype {
+    font-size: 0.62rem;
+    font-weight: 600;
+    font-style: italic;
+    opacity: 0.85;
+}
+
+.mini-card-icon {
+    font-size: 0.72rem;
+}
+
+.mini-card-title {
+    font-weight: 700;
+    font-size: 0.74rem;
+}
+
+.mini-card-section {
+    padding: 5px 8px;
     display: flex;
     flex-direction: column;
+    gap: 2px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.63rem;
+    color: #334155;
+    background: #ffffff;
 }
 
-.palette-item-title {
-    font-size: 0.73rem;
+.mini-card-section.mini-methods {
+    border-top: 1px dashed #e2e8f0;
+    background: #fafafa;
+}
+
+.mini-card-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mini-card-line.enum-line {
+    font-weight: 600;
+    color: #166534;
+}
+
+.mini-vis {
     font-weight: 700;
-    color: #1e293b;
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    width: 10px;
 }
 
-.palette-item-desc {
-    font-size: 0.62rem;
-    color: #64748b;
-    line-height: 1.2;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+.text-public { color: #16a34a; }
+.text-protected { color: #d97706; }
+.text-private { color: #dc2626; }
+.mini-field { color: #0f172a; font-weight: 500; }
+.mini-type { color: #64748b; }
+.mini-method { color: #2563eb; font-weight: 500; }
+.mini-bullet { color: #16a34a; font-size: 0.8rem; }
 
-.btn-palette-quick-add {
-    border: none;
-    background: transparent;
+.mini-card-drag-hint {
+    font-size: 0.58rem;
     color: #94a3b8;
-    width: 22px;
-    height: 22px;
-    border-radius: 4px;
+    text-align: center;
+    padding: 3px 0;
+    background: #f8fafc;
+    border-top: 1px solid #f1f5f9;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 0.72rem;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.btn-palette-quick-add:hover {
-    background: #3b82f6;
-    color: #ffffff;
-}
-
-.palette-tip-box {
-    margin-top: auto;
-    padding: 0.55rem;
-    background: #f8fafc;
-    border: 1px dashed #cbd5e1;
-    border-radius: 6px;
-    font-size: 0.64rem;
-    color: #475569;
-    line-height: 1.35;
-    display: flex;
-    gap: 0.4rem;
-    align-items: flex-start;
-}
-
-.palette-tip-box i {
-    color: #f59e0b;
-    font-size: 0.75rem;
-    margin-top: 1px;
-    flex-shrink: 0;
+    gap: 4px;
 }
 
 /* ==========================================================================
@@ -801,4 +961,563 @@
     width: 100%;
     outline: none;
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+/* ==========================================================================
+   AUTO ARRANGE ALGORITHM POPOVER & FLOATING CONTROLS (dbdiagram.io style)
+   ========================================================================== */
+.dropdown-auto-arrange-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.caret-mini {
+    font-size: 0.62rem;
+    margin-left: 2px;
+    opacity: 0.7;
+}
+
+.auto-arrange-popover {
+    position: fixed !important;
+    width: 320px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08);
+    z-index: 999999 !important;
+    overflow: hidden;
+    animation: fadeInPopover 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInPopover {
+    from {
+        opacity: 0;
+        transform: translateY(-4px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.popover-header {
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #0f172a;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+}
+
+.btn-close-popover {
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    font-size: 1.15rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+}
+
+.btn-close-popover:hover {
+    color: #0f172a;
+    background: #f1f5f9;
+}
+
+.popover-body {
+    padding: 4px 0;
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.arrange-option {
+    padding: 10px 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    cursor: pointer;
+    transition: background-color 0.12s ease;
+    border-bottom: 1px solid #f8fafc;
+    outline: none;
+}
+
+.arrange-option:last-child {
+    border-bottom: none;
+}
+
+.arrange-option:hover,
+.arrange-option:focus {
+    background-color: #f8fafc;
+}
+
+.arrange-option.active {
+    background-color: #f1f5f9;
+}
+
+.arrange-icon {
+    font-size: 1rem;
+    color: #2563eb;
+    margin-top: 2px;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.arrange-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.arrange-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 2px;
+}
+
+.arrange-desc {
+    font-size: 0.73rem;
+    color: #64748b;
+    line-height: 1.35;
+}
+
+.arrange-badge {
+    background-color: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 1px 7px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.arrange-option.active .arrange-badge {
+    background-color: #e0e7ff;
+    color: #3730a3;
+    border-color: #c7d2fe;
+}
+
+/* Floating Bottom Controls (dbdiagram.io style) */
+.canvas-bottom-floating-bar {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+    z-index: 20;
+    padding: 3px 5px;
+    gap: 3px;
+}
+
+.btn-float-action {
+    border: none;
+    background: transparent;
+    color: #475569;
+    width: 32px;
+    height: 32px;
+    border-radius: 5px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 0.85rem;
+    position: relative;
+    transition: all 0.15s ease;
+}
+
+.btn-float-action:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.float-action-badge {
+    position: absolute;
+    bottom: 3px;
+    right: 3px;
+    font-size: 0.58rem;
+    font-weight: 700;
+    background: #e2e8f0;
+    color: #334155;
+    line-height: 1;
+    padding: 1px 3px;
+    border-radius: 3px;
+}
+
+.float-bar-sep {
+    width: 1px;
+    height: 18px;
+    background: #e2e8f0;
+    margin: 0 2px;
+}
+
+/* ==========================================================================
+   Interactive Selection States (Cards & Connector Lines - dbdiagram.io UX)
+   ========================================================================== */
+
+/* 1. Seleksi Kartu Kelas (Node Card Selected) */
+.diagram-class-card {
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+    cursor: pointer;
+}
+
+.diagram-class-card .class-card-header {
+    cursor: pointer;
+}
+
+.diagram-class-card.is-selected {
+    border-color: #2563eb !important;
+    box-shadow: 0 0 0 2.5px #2563eb, 0 10px 24px rgba(37, 99, 235, 0.18) !important;
+    z-index: 25 !important;
+    cursor: grab;
+}
+
+.diagram-class-card.is-selected .class-card-header {
+    background-color: #f0f7ff;
+    border-bottom-color: #bfdbfe;
+    cursor: grab;
+}
+
+.diagram-class-card.is-dragging,
+.diagram-class-card.is-dragging .class-card-header {
+    cursor: grabbing !important;
+}
+
+.diagram-class-card.is-related {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.45), 0 6px 16px rgba(59, 130, 246, 0.12) !important;
+}
+
+/* 2. Seleksi Garis Konektor Relasi (Connector Line Clickable & Selected) */
+.relation-hit-area {
+    stroke: transparent;
+    stroke-width: 18px;
+    fill: none;
+    pointer-events: stroke;
+    cursor: pointer;
+}
+
+.relation-path {
+    pointer-events: stroke;
+    cursor: pointer;
+    transition: stroke 0.15s ease, stroke-width 0.15s ease, filter 0.15s ease;
+}
+
+.relation-path:hover,
+.relation-path.is-hovered {
+    stroke: #2563eb !important;
+    stroke-width: 2.2px !important;
+}
+
+.relation-path.is-selected {
+    stroke: #2563eb !important;
+    stroke-width: 2.8px !important;
+    filter: drop-shadow(0 2px 6px rgba(37, 99, 235, 0.45));
+}
+
+.relation-path.is-connected-to-selected {
+    stroke: #3b82f6 !important;
+    stroke-width: 2.2px !important;
+}
+
+/* 3. Label Relasi Interaktif */
+.relation-label-group {
+    pointer-events: all;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.relation-label-group:hover {
+    transform: scale(1.05);
+}
+
+.relation-label-group:hover .relation-label-bg,
+.relation-label-group.is-selected .relation-label-bg {
+    stroke: #2563eb !important;
+    fill: #eff6ff !important;
+    stroke-width: 1.5px !important;
+}
+
+.relation-label-group:hover .relation-label-text,
+.relation-label-group.is-selected .relation-label-text {
+    fill: #1d4ed8 !important;
+    font-weight: 600 !important;
+}
+
+/* 4. Kardinalitas Badge Interaktif */
+.cardinality-badge-group {
+    pointer-events: all;
+    cursor: pointer;
+}
+
+.cardinality-badge-group:hover rect,
+.cardinality-badge-group.is-selected rect {
+    stroke: #2563eb !important;
+    fill: #eff6ff !important;
+}
+
+.cardinality-badge-group:hover text,
+.cardinality-badge-group.is-selected text {
+    fill: #1d4ed8 !important;
+    font-weight: 700 !important;
+}
+
+/* ==========================================================================
+   Dark Grey Canvas & High-Legibility Card Typography
+   ========================================================================== */
+
+/* 1. Background Canvas: Warna Abu-abu Gelap Modern dengan Dot Grid */
+.diagram-canvas-area {
+    background-color: #1e2025 !important;
+}
+
+.canvas-background {
+    background-color: #1e2025 !important;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1.25px, transparent 1.25px) !important;
+    background-size: 24px 24px !important;
+}
+
+/* 2. Card Class: Background Putih Bersih, Teks Hitam & Lebih Besar */
+.diagram-class-card {
+    background-color: #ffffff !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 9px !important;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+}
+
+.class-card-header {
+    background-color: #f8fafc !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    padding: 0.65rem 0.9rem !important;
+}
+
+/* Judul Kelas: Lebih Besar & Hitam Solid */
+.class-title {
+    font-size: 0.95rem !important; /* ~15.2px */
+    font-weight: 700 !important;
+    color: #000000 !important;   /* Hitam */
+    letter-spacing: -0.2px;
+}
+
+.class-stereotype {
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    color: #334155 !important;
+}
+
+.class-card-body {
+    padding: 0.65rem 0.85rem !important;
+    gap: 0.4rem !important;
+}
+
+/* Teks Baris Atribut & Method: Lebih Besar & Hitam */
+.member-row {
+    font-size: 0.85rem !important; /* ~13.6px (naik dari 12px) */
+    line-height: 1.5 !important;
+    gap: 0.5rem !important;
+}
+
+.member-text {
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    color: #000000 !important;    /* Hitam solid, sangat tajam dan jelas */
+}
+
+.visibility-badge {
+    font-size: 0.88rem !important;
+    font-weight: 800 !important;
+}
+
+.member-empty {
+    font-size: 0.78rem !important;
+    color: #475569 !important;
+}
+
+/* 3. Garis Relasi: Kontras Terang di Atas Kanvas Abu-abu Gelap */
+.relation-path {
+    stroke: #94a3b8 !important;   /* Slate terang agar jelas di atas kanvas gelap */
+    stroke-width: 1.8px !important;
+}
+
+.relation-path:hover,
+.relation-path.is-hovered {
+    stroke: #38bdf8 !important;   /* Sky blue cerah saat hover */
+    stroke-width: 2.4px !important;
+}
+
+.relation-path.is-selected {
+    stroke: #3b82f6 !important;   /* Vibrant blue saat terpilih */
+    stroke-width: 2.8px !important;
+    filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.65)) !important;
+}
+
+.relation-path.is-connected-to-selected {
+    stroke: #60a5fa !important;
+    stroke-width: 2.2px !important;
+}
+
+/* Floating Bottom Control Bar pada Kanvas Gelap */
+.canvas-bottom-floating-bar {
+    background: #272a31 !important;
+    border-color: #3f4450 !important;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+.btn-float-action {
+    color: #cbd5e1 !important;
+}
+
+.btn-float-action:hover {
+    background: #373b45 !important;
+    color: #ffffff !important;
+}
+
+.float-action-badge {
+    background: #3f4450 !important;
+    color: #f1f5f9 !important;
+}
+
+.float-bar-sep {
+    background: #3f4450 !important;
+}
+
+/* ==========================================================================
+   Kotak Seleksi Multi-Item (Windows Desktop Style Marquee Selection Box)
+   ========================================================================== */
+.diagram-marquee-box {
+    position: absolute;
+    border: 1.5px solid #3b82f6;
+    background-color: rgba(59, 130, 246, 0.18);
+    pointer-events: none;
+    z-index: 999;
+    border-radius: 2px;
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.25);
+    backdrop-filter: blur(0.5px);
+}
+
+/* ==========================================================================
+   Desktop Context Menu (Klik Kanan pada Objek / Seleksi / Kanvas)
+   ========================================================================== */
+.diagram-context-menu {
+    position: fixed;
+    z-index: 10000;
+    min-width: 220px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    animation: ctxFadeIn 0.12s ease-out;
+}
+
+@keyframes ctxFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.ctx-menu-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 5px 10px;
+    font-size: 0.73rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    border-bottom: 1px solid #f1f5f9;
+    margin-bottom: 3px;
+}
+
+.ctx-menu-header i {
+    font-size: 0.8rem;
+    color: #3b82f6;
+}
+
+.ctx-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: 5px;
+    font-size: 0.84rem;
+    font-weight: 500;
+    color: #1e293b;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, color 0.12s;
+}
+
+.ctx-menu-item i {
+    font-size: 0.85rem;
+    width: 16px;
+    text-align: center;
+    color: #64748b;
+}
+
+.ctx-menu-item:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.ctx-menu-item:hover i {
+    color: #3b82f6;
+}
+
+.ctx-menu-item.ctx-item-danger {
+    color: #ef4444;
+}
+
+.ctx-menu-item.ctx-item-danger i {
+    color: #ef4444;
+}
+
+.ctx-menu-item.ctx-item-danger:hover {
+    background: #fef2f2;
+    color: #dc2626;
+}
+
+.ctx-menu-item.ctx-item-danger:hover i {
+    color: #dc2626;
+}
+
+.ctx-menu-divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 4px 2px;
+}
+
+.ctx-menu-shortcut {
+    margin-left: auto;
+    font-size: 0.72rem;
+    color: #94a3b8;
+    background: #f8fafc;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+    font-family: monospace;
 }

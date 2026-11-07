@@ -17,13 +17,21 @@ window.DiagramCanvas = (function () {
             isPanning: false,
             panStartX: 0,
             panStartY: 0,
+            isSpacePressed: false,
+            isMarqueeSelecting: false,
+            marqueeStart: { clientX: 0, clientY: 0, canvasX: 0, canvasY: 0, initialSelectedIds: new Set() },
+            selectedNodeId: null,
+            selectedNodeIds: new Set(),
+            selectedRelation: null,
             activeDragNodeId: null,
             dragOffset: { x: 0, y: 0 },
             isLocked: false,
             onUpdate: null,
             onPositionChange: null,
             onCodeChange: null,
-            savedLayoutData: null
+            onSelect: null,
+            savedLayoutData: null,
+            currentAlgorithm: 'compact'
         };
 
         // Inisialisasi SVG defs untuk marker panah dan simbol relasi
@@ -35,15 +43,20 @@ window.DiagramCanvas = (function () {
         /**
          * Render diagram lengkap dari model data
          */
-        function render(classes, relations, shouldAutoFit = true, customLayout = null) {
+        function render(classes, relations, shouldAutoFit = true, customLayout = undefined) {
             state.classes = classes || [];
             state.relations = relations || [];
 
+            // Jika customLayout eksplisit null, bersihkan memori posisi tersimpan sebelumnya
+            if (customLayout === null) {
+                state.savedLayoutData = null;
+            }
+
             // Hitung layout bebas tabrakan bawaan
-            state.nodePositions = DiagramLayout.computeLayout(state.classes, state.relations);
+            state.nodePositions = DiagramLayout.computeLayout(state.classes, state.relations, state.currentAlgorithm);
 
             // Jika ada posisi tersimpan (customLayout), terapkan koordinat tersimpan
-            const layoutSource = customLayout || state.savedLayoutData;
+            const layoutSource = (customLayout !== undefined && customLayout !== null) ? customLayout : state.savedLayoutData;
             let hasSavedPositions = false;
 
             if (layoutSource && typeof layoutSource === 'object') {
@@ -87,6 +100,9 @@ window.DiagramCanvas = (function () {
                 document.fonts.ready.then(() => {
                     measureActualNodeDimensions();
                     updateConnectors();
+                    if (shouldAutoFit === true) {
+                        autoFit();
+                    }
                 });
             }
 
@@ -189,6 +205,116 @@ window.DiagramCanvas = (function () {
         }
 
         /**
+         * Helper cek kesamaan dua relasi
+         */
+        function isSameRelation(r1, r2) {
+            if (!r1 || !r2) return false;
+            return r1.source === r2.source &&
+                   r1.target === r2.target &&
+                   r1.type === r2.type &&
+                   (r1.label || '') === (r2.label || '');
+        }
+
+        /**
+         * Terapkan update status visual seleksi pada seluruh kartu dan garis
+         */
+        function applySelectionUI() {
+            state.classes.forEach(cls => {
+                const card = document.getElementById('node_' + cls.id);
+                if (card) {
+                    const isSelected = state.selectedNodeIds.has(cls.id);
+                    const isRelated = state.selectedRelation && (cls.id === state.selectedRelation.source || cls.id === state.selectedRelation.target);
+
+                    card.classList.toggle('is-selected', isSelected);
+                    card.classList.toggle('is-related', isRelated);
+                }
+            });
+
+            updateConnectors();
+        }
+
+        /**
+         * Pilih kartu kelas secara interaktif (dukung Shift/Ctrl untuk multi-select)
+         */
+        function selectNode(nodeId, isToggle = false) {
+            state.selectedRelation = null;
+
+            if (isToggle) {
+                if (state.selectedNodeIds.has(nodeId)) {
+                    state.selectedNodeIds.delete(nodeId);
+                } else {
+                    state.selectedNodeIds.add(nodeId);
+                }
+            } else {
+                state.selectedNodeIds.clear();
+                state.selectedNodeIds.add(nodeId);
+            }
+
+            state.selectedNodeId = state.selectedNodeIds.size > 0 ? Array.from(state.selectedNodeIds)[0] : null;
+
+            applySelectionUI();
+
+            if (typeof state.onSelect === 'function') {
+                state.onSelect({
+                    type: 'node',
+                    id: state.selectedNodeId,
+                    selectedIds: Array.from(state.selectedNodeIds)
+                });
+            }
+        }
+
+        /**
+         * Set seleksi banyak kartu sekaligus (misalnya dari kotak seleksi marquee)
+         */
+        function setMultiSelection(nodeIds) {
+            state.selectedRelation = null;
+            state.selectedNodeIds.clear();
+            nodeIds.forEach(id => state.selectedNodeIds.add(id));
+            state.selectedNodeId = state.selectedNodeIds.size > 0 ? Array.from(state.selectedNodeIds)[0] : null;
+
+            applySelectionUI();
+
+            if (typeof state.onSelect === 'function') {
+                state.onSelect({
+                    type: 'node',
+                    id: state.selectedNodeId,
+                    selectedIds: Array.from(state.selectedNodeIds)
+                });
+            }
+        }
+
+        /**
+         * Pilih garis konektor relasi secara interaktif
+         */
+        function selectRelation(rel) {
+            state.selectedRelation = rel;
+            state.selectedNodeIds.clear();
+            state.selectedNodeId = null;
+
+            applySelectionUI();
+
+            if (typeof state.onSelect === 'function') {
+                state.onSelect({ type: 'relation', data: rel });
+            }
+        }
+
+        /**
+         * Bersihkan seleksi pada kartu dan garis relasi
+         */
+        function clearSelection() {
+            if (state.selectedNodeIds.size === 0 && !state.selectedRelation) return;
+            state.selectedNodeIds.clear();
+            state.selectedNodeId = null;
+            state.selectedRelation = null;
+
+            applySelectionUI();
+
+            if (typeof state.onSelect === 'function') {
+                state.onSelect(null);
+            }
+        }
+
+        /**
          * Render elemen HTML untuk setiap kelas diagram dengan dukungan interaktif:
          * - Klik ganda untuk inline edit nama kelas, atribut, dan metode
          * - Tombol [+] di setiap bagian untuk tambah baris baru secara instan
@@ -200,13 +326,27 @@ window.DiagramCanvas = (function () {
             state.classes.forEach(cls => {
                 const pos = state.nodePositions.get(cls.id) || { x: 100, y: 100, width: 260, height: 160 };
 
+                const isSelected = state.selectedNodeIds.has(cls.id);
+                const isRelated = state.selectedRelation && (cls.id === state.selectedRelation.source || cls.id === state.selectedRelation.target);
+                let cardClass = 'diagram-class-card' + (state.isLocked ? ' is-locked' : '');
+                if (isSelected) cardClass += ' is-selected';
+                if (isRelated) cardClass += ' is-related';
+
                 const card = document.createElement('div');
-                card.className = 'diagram-class-card' + (state.isLocked ? ' is-locked' : '');
+                card.className = cardClass;
                 card.id = 'node_' + cls.id;
                 card.setAttribute('data-id', cls.id);
                 card.style.left = pos.x + 'px';
                 card.style.top = pos.y + 'px';
                 card.style.width = pos.width + 'px';
+
+                // Klik kartu untuk memilih (dukung Shift/Ctrl untuk toggle multi-select)
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('button, input, textarea, .btn-card-add-row, .btn-row-del, .btn-card-del, .card-inline-input')) return;
+                    e.stopPropagation();
+                    const isToggle = e.shiftKey || e.ctrlKey || e.metaKey;
+                    selectNode(cls.id, isToggle);
+                });
 
                 // Header Card
                 const header = document.createElement('div');
@@ -717,14 +857,45 @@ window.DiagramCanvas = (function () {
             targetHandle.addEventListener('mousedown', (e) => {
                 // Hanya tangani klik kiri
                 if (e.button !== 0) return;
-                // Cegah pergeseran jika mode Lock Position aktif
-                if (state.isLocked) return;
+
                 // Cegah pergeseran jika user mengklik tombol atau inline editor
                 if (e.target.closest('button, input, textarea, .btn-card-add-row, .btn-row-del, .btn-card-del, .card-inline-input')) return;
+
+                const isToggle = e.shiftKey || e.ctrlKey || e.metaKey;
+                const wasAlreadySelected = state.selectedNodeIds.has(nodeId);
+
+                // 1. Jika kartu BELUM aktif / belum diklik sebelumnya:
+                // Harus diklik dulu untuk mengaktifkan kartu; belum bisa di-drag!
+                if (!wasAlreadySelected) {
+                    e.stopPropagation();
+                    if (isToggle) {
+                        selectNode(nodeId, true);
+                    } else {
+                        selectNode(nodeId, false);
+                    }
+                    return;
+                }
+
+                // 2. Jika menekan Shift/Ctrl pada kartu yang SUDAH aktif, toggle untuk melepas seleksi
+                if (isToggle) {
+                    e.stopPropagation();
+                    selectNode(nodeId, true);
+                    return;
+                }
+
+                // 3. Kartu SUDAH aktif / terpilih: Sekarang kartu BISA di-drag!
+                if (state.isLocked) return;
                 e.stopPropagation();
 
                 state.activeDragNodeId = nodeId;
                 cardElement.classList.add('is-dragging');
+
+                // Simpan posisi awal untuk semua kartu terpilih agar bisa digeser bersamaan
+                const initialPositions = new Map();
+                state.selectedNodeIds.forEach(id => {
+                    const p = state.nodePositions.get(id);
+                    if (p) initialPositions.set(id, { x: p.x, y: p.y });
+                });
 
                 const pos = state.nodePositions.get(nodeId);
                 const mouseCanvasX = (e.clientX - state.panX) / state.zoom;
@@ -737,10 +908,14 @@ window.DiagramCanvas = (function () {
                 };
 
                 let hasMoved = false;
+                const startClientX = e.clientX;
+                const startClientY = e.clientY;
 
                 const onMouseMove = (moveEvent) => {
                     if (state.activeDragNodeId !== nodeId) return;
-                    hasMoved = true;
+                    if (Math.abs(moveEvent.clientX - startClientX) > 3 || Math.abs(moveEvent.clientY - startClientY) > 3) {
+                        hasMoved = true;
+                    }
 
                     const curCanvasX = (moveEvent.clientX - state.panX) / state.zoom;
                     const curCanvasY = (moveEvent.clientY - state.panY) / state.zoom;
@@ -751,11 +926,33 @@ window.DiagramCanvas = (function () {
                     // Deteksi magnetik smart snapping & guidelines (Canva UX)
                     const snapResult = checkSmartSnapping(nodeId, rawX, rawY);
 
-                    pos.x = snapResult.x;
-                    pos.y = snapResult.y;
+                    let finalX = snapResult.x;
+                    let finalY = snapResult.y;
 
-                    cardElement.style.left = pos.x + 'px';
-                    cardElement.style.top = pos.y + 'px';
+                    // Sesuai node_line.md: jika tidak magnetis sejajar dengan kartu lain, snap ke grid 10px
+                    const hasXGuide = snapResult.guides && snapResult.guides.some(g => g.axis === 'x');
+                    const hasYGuide = snapResult.guides && snapResult.guides.some(g => g.axis === 'y');
+                    if (!hasXGuide) finalX = Math.round(finalX / 10) * 10;
+                    if (!hasYGuide) finalY = Math.round(finalY / 10) * 10;
+
+                    const initPrimary = initialPositions.get(nodeId) || pos;
+                    const dx = finalX - initPrimary.x;
+                    const dy = finalY - initPrimary.y;
+
+                    // Geser seluruh kartu yang terpilih secara sinkron
+                    state.selectedNodeIds.forEach(id => {
+                        const p = state.nodePositions.get(id);
+                        const init = initialPositions.get(id);
+                        if (p && init) {
+                            p.x = Math.round(init.x + dx);
+                            p.y = Math.round(init.y + dy);
+                            const el = document.getElementById('node_' + id);
+                            if (el) {
+                                el.style.left = p.x + 'px';
+                                el.style.top = p.y + 'px';
+                            }
+                        }
+                    });
 
                     // Tampilkan garis pemandu sejajar
                     renderAlignmentGuides(snapResult.guides);
@@ -777,6 +974,8 @@ window.DiagramCanvas = (function () {
                         if (typeof state.onPositionChange === 'function') {
                             state.onPositionChange(state.savedLayoutData);
                         }
+                    } else if (!isToggle) {
+                        selectNode(nodeId, false);
                     }
                 };
 
@@ -812,20 +1011,50 @@ window.DiagramCanvas = (function () {
 
             routes.forEach(route => {
                 const rel = route.rel;
+                const isSelected = isSameRelation(state.selectedRelation, rel);
+                const isConnectedToSelectedNode = state.selectedNodeIds.size > 0 && (state.selectedNodeIds.has(rel.source) || state.selectedNodeIds.has(rel.target));
 
-                // Buat elemen path SVG untuk garis relasi
+                // Buat elemen hit area transparan yang lebar (18px) agar garis sangat mudah diklik
+                const hitArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                hitArea.setAttribute('d', route.pathData);
+                hitArea.setAttribute('class', 'relation-hit-area');
+                hitArea.setAttribute('fill', 'none');
+                hitArea.setAttribute('stroke', 'transparent');
+                hitArea.setAttribute('stroke-width', '18');
+                hitArea.style.cursor = 'pointer';
+                hitArea.style.pointerEvents = 'stroke';
+
+                // Buat elemen path SVG untuk garis relasi visual
                 const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 path.setAttribute('d', route.pathData);
-                path.setAttribute('class', 'relation-path rel-type-' + rel.type);
+                let pathClass = 'relation-path rel-type-' + rel.type;
+                if (isSelected) pathClass += ' is-selected';
+                else if (isConnectedToSelectedNode) pathClass += ' is-connected-to-selected';
+                path.setAttribute('class', pathClass);
                 path.setAttribute('fill', 'none');
+                path.style.cursor = 'pointer';
+                path.style.pointerEvents = 'stroke';
 
-                // Terapkan marker panah/simbol sesuai tipe relasi
-                applyMarkers(path, rel.type);
+                // Terapkan marker panah/simbol sesuai tipe relasi (gunakan varian selected jika aktif)
+                applyMarkers(path, rel.type, isSelected);
+
+                // Event klik pada garis relasi
+                const handleRelClick = (e) => {
+                    e.stopPropagation();
+                    selectRelation(rel);
+                };
+                path.addEventListener('click', handleRelClick);
+                hitArea.addEventListener('click', handleRelClick);
+
+                // Efek hover sinkron antara hit area dan garis visual
+                hitArea.addEventListener('mouseenter', () => path.classList.add('is-hovered'));
+                hitArea.addEventListener('mouseleave', () => path.classList.remove('is-hovered'));
 
                 connectorsLayer.appendChild(path);
+                connectorsLayer.appendChild(hitArea);
 
                 // Render kardinalitas & label pada labelsLayer
-                renderRelationLabels(route, labelsLayer);
+                renderRelationLabels(route, labelsLayer, isSelected, rel);
             });
 
             if (guidesLayer) svgElement.appendChild(guidesLayer);
@@ -834,30 +1063,31 @@ window.DiagramCanvas = (function () {
         /**
          * Terapkan marker SVG sesuai tipe relasi
          */
-        function applyMarkers(pathElement, type) {
+        function applyMarkers(pathElement, type, isSelected = false) {
+            const suffix = isSelected ? '-selected' : '';
             switch (type) {
                 case 'inheritance':
-                    pathElement.setAttribute('marker-end', 'url(#marker-inheritance)');
+                    pathElement.setAttribute('marker-end', `url(#marker-inheritance${suffix})`);
                     break;
                 case 'realization':
-                    pathElement.setAttribute('marker-end', 'url(#marker-realization)');
+                    pathElement.setAttribute('marker-end', `url(#marker-realization${suffix})`);
                     pathElement.setAttribute('stroke-dasharray', '5,5');
                     break;
                 case 'composition':
-                    pathElement.setAttribute('marker-start', 'url(#marker-composition)');
-                    pathElement.setAttribute('marker-end', 'url(#marker-arrow)');
+                    pathElement.setAttribute('marker-start', `url(#marker-composition${suffix})`);
+                    pathElement.setAttribute('marker-end', `url(#marker-arrow${suffix})`);
                     break;
                 case 'aggregation':
-                    pathElement.setAttribute('marker-start', 'url(#marker-aggregation)');
-                    pathElement.setAttribute('marker-end', 'url(#marker-arrow)');
+                    pathElement.setAttribute('marker-start', `url(#marker-aggregation${suffix})`);
+                    pathElement.setAttribute('marker-end', `url(#marker-arrow${suffix})`);
                     break;
                 case 'dependency':
-                    pathElement.setAttribute('marker-end', 'url(#marker-arrow)');
+                    pathElement.setAttribute('marker-end', `url(#marker-arrow${suffix})`);
                     pathElement.setAttribute('stroke-dasharray', '5,5');
                     break;
                 case 'association':
                 default:
-                    pathElement.setAttribute('marker-end', 'url(#marker-arrow)');
+                    pathElement.setAttribute('marker-end', `url(#marker-arrow${suffix})`);
                     break;
             }
         }
@@ -865,28 +1095,36 @@ window.DiagramCanvas = (function () {
         /**
          * Render teks label relasi dan kardinalitas
          */
-        function renderRelationLabels(route, labelsLayer) {
-            const rel = route.rel;
+        function renderRelationLabels(route, labelsLayer, isSelected = false, rel = null) {
+            const relData = rel || route.rel;
             const conn = route.connection;
 
             // Label relasi di titik tengah rute yang paling bebas rintangan
-            if (rel.label && route.labelPoint) {
+            if (relData.label && route.labelPoint) {
                 const midX = route.labelPoint.x;
                 const midY = route.labelPoint.y;
 
                 const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                g.setAttribute('class', 'relation-label-group');
+                g.setAttribute('class', 'relation-label-group' + (isSelected ? ' is-selected' : ''));
+                g.style.cursor = 'pointer';
+                g.style.pointerEvents = 'all';
 
-                const labelStr = String(rel.label);
+                // Klik label untuk memilih relasi
+                g.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectRelation(relData);
+                });
+
+                const labelStr = String(relData.label);
                 const initW = Math.max(28, labelStr.length * 7.5 + 16);
                 const initH = 20;
 
                 // Background pill agar teks tidak pernah tertutup atau terpotong garis (solid white, border, drop-shadow)
                 const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
                 rect.setAttribute('class', 'relation-label-bg');
-                rect.setAttribute('fill', '#ffffff');
-                rect.setAttribute('stroke', '#cbd5e1');
-                rect.setAttribute('stroke-width', '1');
+                rect.setAttribute('fill', isSelected ? '#eff6ff' : '#ffffff');
+                rect.setAttribute('stroke', isSelected ? '#2563eb' : '#cbd5e1');
+                rect.setAttribute('stroke-width', isSelected ? '1.5' : '1');
                 rect.setAttribute('rx', '4');
                 rect.setAttribute('ry', '4');
                 rect.setAttribute('x', midX - initW / 2);
@@ -921,20 +1159,20 @@ window.DiagramCanvas = (function () {
             }
 
             // Kardinalitas Sumber (Source Cardinality)
-            if (rel.sourceCard && conn.source) {
-                renderCardinalityBadge(conn.source, conn.sourceSide, rel.sourceCard, false, labelsLayer);
+            if (relData.sourceCard && conn.source) {
+                renderCardinalityBadge(conn.source, conn.sourceSide, relData.sourceCard, false, labelsLayer, isSelected, relData);
             }
 
             // Kardinalitas Target (Target Cardinality)
-            if (rel.targetCard && conn.target) {
-                renderCardinalityBadge(conn.target, conn.targetSide, rel.targetCard, true, labelsLayer);
+            if (relData.targetCard && conn.target) {
+                renderCardinalityBadge(conn.target, conn.targetSide, relData.targetCard, true, labelsLayer, isSelected, relData);
             }
         }
 
         /**
          * Render badge kardinalitas dengan background putih dan border pelindung (anti-tertutup garis)
          */
-        function renderCardinalityBadge(point, side, text, isTarget, labelsLayer) {
+        function renderCardinalityBadge(point, side, text, isTarget, labelsLayer, isSelected = false, rel = null) {
             let posX = point.x;
             let posY = point.y;
 
@@ -954,7 +1192,15 @@ window.DiagramCanvas = (function () {
             }
 
             const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-            g.setAttribute('class', 'cardinality-badge-group');
+            g.setAttribute('class', 'cardinality-badge-group' + (isSelected ? ' is-selected' : ''));
+            g.style.cursor = 'pointer';
+            g.style.pointerEvents = 'all';
+
+            // Klik badge kardinalitas untuk memilih relasi
+            g.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (rel) selectRelation(rel);
+            });
 
             const textStr = String(text);
             const initW = Math.max(18, textStr.length * 7 + 10);
@@ -962,8 +1208,8 @@ window.DiagramCanvas = (function () {
 
             const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             rect.setAttribute('class', 'cardinality-badge-bg');
-            rect.setAttribute('fill', '#ffffff');
-            rect.setAttribute('stroke', '#cbd5e1');
+            rect.setAttribute('fill', isSelected ? '#eff6ff' : '#ffffff');
+            rect.setAttribute('stroke', isSelected ? '#2563eb' : '#cbd5e1');
             rect.setAttribute('stroke-width', '1');
             rect.setAttribute('rx', '3');
             rect.setAttribute('ry', '3');
@@ -1010,61 +1256,476 @@ window.DiagramCanvas = (function () {
             }
 
             defs.innerHTML = `
-                <!-- Pewarisan / Inheritance (Segitiga putih solid) -->
+                <!-- Pewarisan / Inheritance (Segitiga solid kontras gelap) -->
                 <marker id="marker-inheritance" viewBox="0 0 14 14" refX="13" refY="7" markerWidth="11" markerHeight="11" orient="auto">
-                    <polygon points="1 2, 13 7, 1 12" fill="#ffffff" stroke="#111827" stroke-width="1.5" />
+                    <polygon points="1 2, 13 7, 1 12" fill="#1e2025" stroke="#94a3b8" stroke-width="1.6" />
+                </marker>
+                <marker id="marker-inheritance-selected" viewBox="0 0 14 14" refX="13" refY="7" markerWidth="11" markerHeight="11" orient="auto">
+                    <polygon points="1 2, 13 7, 1 12" fill="#ffffff" stroke="#3b82f6" stroke-width="2" />
                 </marker>
 
                 <!-- Realisasi / Interface Implementation -->
                 <marker id="marker-realization" viewBox="0 0 14 14" refX="13" refY="7" markerWidth="11" markerHeight="11" orient="auto">
-                    <polygon points="1 2, 13 7, 1 12" fill="#ffffff" stroke="#111827" stroke-width="1.5" />
+                    <polygon points="1 2, 13 7, 1 12" fill="#1e2025" stroke="#94a3b8" stroke-width="1.6" />
+                </marker>
+                <marker id="marker-realization-selected" viewBox="0 0 14 14" refX="13" refY="7" markerWidth="11" markerHeight="11" orient="auto">
+                    <polygon points="1 2, 13 7, 1 12" fill="#ffffff" stroke="#3b82f6" stroke-width="2" />
                 </marker>
 
-                <!-- Komposisi / Composition (Belah ketupat hitam penuh) -->
+                <!-- Komposisi / Composition (Belah ketupat penuh) -->
                 <marker id="marker-composition" viewBox="0 0 16 16" refX="1" refY="8" markerWidth="12" markerHeight="12" orient="auto">
-                    <polygon points="1 8, 8 3, 15 8, 8 13" fill="#111827" stroke="#111827" />
+                    <polygon points="1 8, 8 3, 15 8, 8 13" fill="#94a3b8" stroke="#94a3b8" />
+                </marker>
+                <marker id="marker-composition-selected" viewBox="0 0 16 16" refX="1" refY="8" markerWidth="12" markerHeight="12" orient="auto">
+                    <polygon points="1 8, 8 3, 15 8, 8 13" fill="#3b82f6" stroke="#3b82f6" />
                 </marker>
 
-                <!-- Agregasi / Aggregation (Belah ketupat putih) -->
+                <!-- Agregasi / Aggregation (Belah ketupat kontras) -->
                 <marker id="marker-aggregation" viewBox="0 0 16 16" refX="1" refY="8" markerWidth="12" markerHeight="12" orient="auto">
-                    <polygon points="1 8, 8 3, 15 8, 8 13" fill="#ffffff" stroke="#111827" stroke-width="1.5" />
+                    <polygon points="1 8, 8 3, 15 8, 8 13" fill="#1e2025" stroke="#94a3b8" stroke-width="1.6" />
+                </marker>
+                <marker id="marker-aggregation-selected" viewBox="0 0 16 16" refX="1" refY="8" markerWidth="12" markerHeight="12" orient="auto">
+                    <polygon points="1 8, 8 3, 15 8, 8 13" fill="#ffffff" stroke="#3b82f6" stroke-width="2" />
                 </marker>
 
                 <!-- Asosiasi / Panah Biasa -->
                 <marker id="marker-arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto">
-                    <polyline points="2 2, 10 6, 2 10" fill="none" stroke="#111827" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    <polyline points="2 2, 10 6, 2 10" fill="none" stroke="#94a3b8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+                </marker>
+                <marker id="marker-arrow-selected" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto">
+                    <polyline points="2 2, 10 6, 2 10" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                 </marker>
             `;
         }
 
         /**
-         * Interaksi Pan & Zoom pada kanvas
+         * Interaksi Pan, Zoom, Seleksi Kotak Marquee (Shift + Drag), dan Menu Konteks (Klik Kanan):
+         * - Klik kiri biasa pada latar kanvas: DRAG / PAN LAYOUT KANVAS (bebas geser)
+         * - Shift + Klik kiri pada latar kanvas: KOTAK SELEKSI MARQUEE (pilih banyak kartu sekaligus)
+         * - Shift + Klik kiri pada kartu: Toggle seleksi multi-kartu
+         * - Klik kanan pada kartu, relasi, atau kanvas: MENU KONTEKS (Hapus, Duplikat, Tambah, Rapikan, dll)
+         * - Tombol Delete / Backspace: Hapus kartu atau relasi terpilih
          */
         function setupCanvasInteractions() {
-            // Drag kanvas untuk Pan
+            let marqueeBox = containerElement.querySelector('#diagramMarqueeBox');
+            if (!marqueeBox) {
+                marqueeBox = document.createElement('div');
+                marqueeBox.id = 'diagramMarqueeBox';
+                marqueeBox.className = 'diagram-marquee-box';
+                marqueeBox.style.display = 'none';
+                containerElement.appendChild(marqueeBox);
+            }
+
+            let contextMenu = document.getElementById('diagramContextMenu');
+            if (!contextMenu) {
+                contextMenu = document.createElement('div');
+                contextMenu.id = 'diagramContextMenu';
+                contextMenu.className = 'diagram-context-menu';
+                contextMenu.style.display = 'none';
+                document.body.appendChild(contextMenu);
+            }
+
+            function localEscape(str) {
+                if (!str) return '';
+                return String(str)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function hideContextMenu() {
+                if (contextMenu) contextMenu.style.display = 'none';
+            }
+
+            function showContextMenu(clientX, clientY, items, title = '', icon = '') {
+                if (!contextMenu || !items || items.length === 0) return;
+
+                let html = '';
+                if (title) {
+                    html += `<div class="ctx-menu-header"><i class="${icon || 'fa-solid fa-layer-group'}"></i> <span>${localEscape(title)}</span></div>`;
+                }
+
+                items.forEach((item, index) => {
+                    if (item.divider) {
+                        html += `<div class="ctx-menu-divider"></div>`;
+                    } else {
+                        const dangerCls = item.danger ? ' ctx-item-danger' : '';
+                        const shortcutHtml = item.shortcut ? `<span class="ctx-menu-shortcut">${item.shortcut}</span>` : '';
+                        html += `
+                            <div class="ctx-menu-item${dangerCls}" data-index="${index}">
+                                <i class="${item.icon || 'fa-solid fa-circle-dot'}"></i>
+                                <span>${localEscape(item.label)}</span>
+                                ${shortcutHtml}
+                            </div>
+                        `;
+                    }
+                });
+
+                contextMenu.innerHTML = html;
+
+                contextMenu.querySelectorAll('.ctx-menu-item').forEach(el => {
+                    el.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const idx = parseInt(el.getAttribute('data-index'), 10);
+                        const itm = items[idx];
+                        hideContextMenu();
+                        if (itm && typeof itm.action === 'function') {
+                            itm.action();
+                        }
+                    });
+                });
+
+                contextMenu.style.display = 'block';
+                const menuW = contextMenu.offsetWidth || 210;
+                const menuH = contextMenu.offsetHeight || 190;
+                const posX = Math.min(clientX, window.innerWidth - menuW - 12);
+                const posY = Math.min(clientY, window.innerHeight - menuH - 12);
+                contextMenu.style.left = Math.max(10, posX) + 'px';
+                contextMenu.style.top = Math.max(10, posY) + 'px';
+            }
+
+            // Mouse down pada container kanvas
             containerElement.addEventListener('mousedown', (e) => {
-                // Hanya pan jika klik tengah atau klik pada latar kanvas
-                if (e.target !== containerElement && !e.target.classList.contains('canvas-background')) {
+                hideContextMenu();
+
+                const isMiddleClick = (e.button === 1);
+                const isSpacePan = (e.button === 0 && state.isSpacePressed);
+                const isShiftDrag = (e.button === 0 && (e.shiftKey || e.ctrlKey || e.metaKey));
+
+                // 1. Shift + Klik Kiri pada latar kanvas: Kotak Seleksi (Marquee Selection)
+                if (isShiftDrag) {
+                    const isCanvasBg = (
+                        e.target === containerElement ||
+                        e.target.classList.contains('canvas-background') ||
+                        e.target.classList.contains('diagram-viewport') ||
+                        e.target.tagName.toLowerCase() === 'svg' ||
+                        e.target.id === 'connectorsLayer' ||
+                        e.target.id === 'labelsLayer'
+                    );
+
+                    if (isCanvasBg) {
+                        e.preventDefault();
+                        const rect = containerElement.getBoundingClientRect();
+                        state.isMarqueeSelecting = true;
+                        state.marqueeStart = {
+                            clientX: e.clientX,
+                            clientY: e.clientY,
+                            canvasX: (e.clientX - rect.left - state.panX) / state.zoom,
+                            canvasY: (e.clientY - rect.top - state.panY) / state.zoom,
+                            initialSelectedIds: new Set(state.selectedNodeIds)
+                        };
+
+                        marqueeBox.style.left = (e.clientX - rect.left) + 'px';
+                        marqueeBox.style.top = (e.clientY - rect.top) + 'px';
+                        marqueeBox.style.width = '0px';
+                        marqueeBox.style.height = '0px';
+                        marqueeBox.style.display = 'none';
+                        return;
+                    }
+                }
+
+                // 2. Klik Kiri Biasa (e.button === 0) atau Klik Tengah atau Space+Drag:
+                // DRAG / PAN KANVAS LAYOUT!
+                if (e.button === 0 || isMiddleClick || isSpacePan) {
+                    const isCanvasBg = (
+                        e.target === containerElement ||
+                        e.target.classList.contains('canvas-background') ||
+                        e.target.classList.contains('diagram-viewport') ||
+                        e.target.tagName.toLowerCase() === 'svg' ||
+                        e.target.id === 'connectorsLayer' ||
+                        e.target.id === 'labelsLayer'
+                    );
+
+                    if (isCanvasBg || isMiddleClick) {
+                        e.preventDefault();
+                        state.isPanning = true;
+                        state.hasPanned = false;
+                        state.panDownClientX = e.clientX;
+                        state.panDownClientY = e.clientY;
+                        state.panStartX = e.clientX - state.panX;
+                        state.panStartY = e.clientY - state.panY;
+                        containerElement.style.cursor = 'grabbing';
+                    }
+                }
+            });
+
+            containerElement.addEventListener('auxclick', (e) => {
+                if (e.button === 1) e.preventDefault();
+            });
+
+            // Klik kanan untuk Menu Konteks (Context Menu)
+            containerElement.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                hideContextMenu();
+
+                // 1. Klik kanan pada kartu kelas
+                const cardElem = e.target.closest('.diagram-class-card');
+                if (cardElem) {
+                    const classId = cardElem.getAttribute('data-id');
+                    if (!state.selectedNodeIds.has(classId) && !e.shiftKey) {
+                        selectNode(classId, false);
+                    } else if (e.shiftKey) {
+                        selectNode(classId, true);
+                    }
+
+                    const count = state.selectedNodeIds.size;
+                    const cls = state.classes.find(c => c.id === classId);
+
+                    if (count > 1) {
+                        showContextMenu(e.clientX, e.clientY, [
+                            {
+                                label: `Hapus ${count} Kelas Terpilih`,
+                                icon: 'fa-solid fa-trash-can',
+                                danger: true,
+                                shortcut: 'Del',
+                                action: () => {
+                                    if (confirm(`Hapus ${count} kelas terpilih beserta relasinya?`)) {
+                                        deleteClasses(Array.from(state.selectedNodeIds));
+                                    }
+                                }
+                            },
+                            { divider: true },
+                            {
+                                label: state.isLocked ? 'Buka Kunci Posisi' : 'Kunci Posisi Kartu',
+                                icon: state.isLocked ? 'fa-solid fa-lock-open' : 'fa-solid fa-lock',
+                                action: () => toggleLock()
+                            }
+                        ], `${count} Kelas Terpilih`, 'fa-solid fa-shapes');
+                    } else if (cls) {
+                        showContextMenu(e.clientX, e.clientY, [
+                            {
+                                label: 'Hapus Kelas',
+                                icon: 'fa-solid fa-trash-can',
+                                danger: true,
+                                shortcut: 'Del',
+                                action: () => {
+                                    if (confirm(`Hapus kelas "${cls.name}" beserta relasinya?`)) {
+                                        deleteClass(cls.id);
+                                    }
+                                }
+                            },
+                            {
+                                label: 'Duplikat Kelas',
+                                icon: 'fa-solid fa-copy',
+                                action: () => duplicateClass(cls.id)
+                            },
+                            { divider: true },
+                            {
+                                label: 'Tambah Atribut Baru',
+                                icon: 'fa-solid fa-plus',
+                                action: () => addMember(cls.id, 'attribute', '+newAttribute')
+                            },
+                            {
+                                label: 'Tambah Method Baru',
+                                icon: 'fa-solid fa-code',
+                                action: () => addMember(cls.id, 'method', '+newMethod()')
+                            },
+                            { divider: true },
+                            {
+                                label: state.isLocked ? 'Buka Kunci Posisi' : 'Kunci Posisi Kartu',
+                                icon: state.isLocked ? 'fa-solid fa-lock-open' : 'fa-solid fa-lock',
+                                action: () => toggleLock()
+                            }
+                        ], `Kelas: ${cls.name}`, 'fa-solid fa-cube');
+                    }
                     return;
                 }
 
-                state.isPanning = true;
-                state.panStartX = e.clientX - state.panX;
-                state.panStartY = e.clientY - state.panY;
-                containerElement.style.cursor = 'grabbing';
+                // 2. Klik kanan pada garis relasi atau labelnya
+                const relElem = e.target.closest('.relation-path, .relation-hit-area, .relation-label-group, .cardinality-badge-group');
+                if (relElem && state.selectedRelation) {
+                    const rel = state.selectedRelation;
+                    showContextMenu(e.clientX, e.clientY, [
+                        {
+                            label: 'Hapus Relasi Ini',
+                            icon: 'fa-solid fa-trash-can',
+                            danger: true,
+                            shortcut: 'Del',
+                            action: () => {
+                                if (confirm(`Hapus relasi "${rel.source}" → "${rel.target}"?`)) {
+                                    deleteRelation(rel);
+                                }
+                            }
+                        }
+                    ], `Relasi: ${rel.source} → ${rel.target}`, 'fa-solid fa-link');
+                    return;
+                }
+
+                // 3. Klik kanan pada latar kosong kanvas
+                const rect = containerElement.getBoundingClientRect();
+                const worldX = Math.round((e.clientX - rect.left - state.panX) / state.zoom);
+                const worldY = Math.round((e.clientY - rect.top - state.panY) / state.zoom);
+
+                showContextMenu(e.clientX, e.clientY, [
+                    {
+                        label: 'Tambah Kelas Baru Di Sini',
+                        icon: 'fa-solid fa-cube',
+                        action: () => addClass('class', null, worldX - 130, worldY - 80)
+                    },
+                    { divider: true },
+                    {
+                        label: 'Rapikan Diagram (Auto Arrange)',
+                        icon: 'fa-solid fa-wand-magic-sparkles',
+                        action: () => relayout()
+                    },
+                    {
+                        label: 'Fit to Screen (Autofit)',
+                        icon: 'fa-solid fa-expand',
+                        action: () => autoFit()
+                    },
+                    {
+                        label: 'Reset Zoom (100%)',
+                        icon: 'fa-solid fa-magnifying-glass',
+                        action: () => resetZoom()
+                    }
+                ], 'Kanvas Diagram', 'fa-solid fa-diagram-project');
             });
 
             window.addEventListener('mousemove', (e) => {
-                if (!state.isPanning) return;
-                state.panX = e.clientX - state.panStartX;
-                state.panY = e.clientY - state.panStartY;
-                applyTransform();
+                if (state.isPanning) {
+                    if (Math.abs(e.clientX - state.panDownClientX) > 3 || Math.abs(e.clientY - state.panDownClientY) > 3) {
+                        state.hasPanned = true;
+                    }
+                    state.panX = e.clientX - state.panStartX;
+                    state.panY = e.clientY - state.panStartY;
+                    applyTransform();
+                    return;
+                }
+
+                if (state.isMarqueeSelecting) {
+                    const rect = containerElement.getBoundingClientRect();
+                    const curClientX = e.clientX;
+                    const curClientY = e.clientY;
+
+                    const diffX = curClientX - state.marqueeStart.clientX;
+                    const diffY = curClientY - state.marqueeStart.clientY;
+
+                    // Tampilkan kotak seleksi jika mouse bergerak lebih dari 3px
+                    if (Math.abs(diffX) > 3 || Math.abs(diffY) > 3) {
+                        marqueeBox.style.display = 'block';
+
+                        const boxLeft = Math.min(state.marqueeStart.clientX, curClientX) - rect.left;
+                        const boxTop = Math.min(state.marqueeStart.clientY, curClientY) - rect.top;
+                        const boxW = Math.abs(diffX);
+                        const boxH = Math.abs(diffY);
+
+                        marqueeBox.style.left = boxLeft + 'px';
+                        marqueeBox.style.top = boxTop + 'px';
+                        marqueeBox.style.width = boxW + 'px';
+                        marqueeBox.style.height = boxH + 'px';
+
+                        // Koordinat bounding box di ruang kanvas (world coordinates)
+                        const curCanvasX = (curClientX - rect.left - state.panX) / state.zoom;
+                        const curCanvasY = (curClientY - rect.top - state.panY) / state.zoom;
+
+                        const worldLeft = Math.min(state.marqueeStart.canvasX, curCanvasX);
+                        const worldTop = Math.min(state.marqueeStart.canvasY, curCanvasY);
+                        const worldRight = Math.max(state.marqueeStart.canvasX, curCanvasX);
+                        const worldBottom = Math.max(state.marqueeStart.canvasY, curCanvasY);
+
+                        // Cek kartu mana saja yang bersinggungan dengan kotak seleksi
+                        const newlySelected = new Set(state.marqueeStart.initialSelectedIds);
+
+                        state.classes.forEach(cls => {
+                            const pos = state.nodePositions.get(cls.id);
+                            if (pos) {
+                                const cardLeft = pos.x;
+                                const cardTop = pos.y;
+                                const cardRight = pos.x + pos.width;
+                                const cardBottom = pos.y + pos.height;
+
+                                const intersects = (
+                                    cardLeft < worldRight &&
+                                    cardRight > worldLeft &&
+                                    cardTop < worldBottom &&
+                                    cardBottom > worldTop
+                                );
+
+                                if (intersects) {
+                                    newlySelected.add(cls.id);
+                                }
+                            }
+                        });
+
+                        state.selectedNodeIds = newlySelected;
+                        state.selectedNodeId = state.selectedNodeIds.size > 0 ? Array.from(state.selectedNodeIds)[0] : null;
+                        applySelectionUI();
+                    }
+                }
             });
 
-            window.addEventListener('mouseup', () => {
+            window.addEventListener('mouseup', (e) => {
                 if (state.isPanning) {
                     state.isPanning = false;
-                    containerElement.style.cursor = 'default';
+                    containerElement.style.cursor = state.isSpacePressed ? 'grab' : 'default';
+
+                    // Jika klik kiri murni tanpa menggeser kanvas (hanya klik biasa di latar kosong):
+                    // Bersihkan seleksi kartu atau relasi
+                    if (!state.hasPanned && e.button === 0 && !e.shiftKey) {
+                        clearSelection();
+                    }
+                }
+
+                if (state.isMarqueeSelecting) {
+                    state.isMarqueeSelecting = false;
+                    marqueeBox.style.display = 'none';
+
+                    if (typeof state.onSelect === 'function') {
+                        state.onSelect({
+                            type: 'node',
+                            id: state.selectedNodeId,
+                            selectedIds: Array.from(state.selectedNodeIds)
+                        });
+                    }
+                }
+            });
+
+            // Tutup context menu saat klik luar atau scroll
+            window.addEventListener('click', (e) => {
+                if (!e.target.closest('.diagram-context-menu')) {
+                    hideContextMenu();
+                }
+            });
+            window.addEventListener('wheel', () => hideContextMenu(), { passive: true });
+
+            // Keyboard shortcut Delete / Backspace untuk hapus item terpilih, dan Escape untuk tutup menu
+            window.addEventListener('keydown', (e) => {
+                if (e.target.closest('input, textarea, [contenteditable="true"]')) return;
+
+                if (e.key === 'Escape') {
+                    hideContextMenu();
+                    return;
+                }
+
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    if (state.selectedNodeIds.size > 0) {
+                        const count = state.selectedNodeIds.size;
+                        if (confirm(count === 1 ? 'Hapus kelas terpilih beserta relasinya?' : `Hapus ${count} kelas terpilih beserta relasinya?`)) {
+                            deleteClasses(Array.from(state.selectedNodeIds));
+                        }
+                    } else if (state.selectedRelation) {
+                        const rel = state.selectedRelation;
+                        if (confirm(`Hapus relasi "${rel.source}" → "${rel.target}"?`)) {
+                            deleteRelation(rel);
+                        }
+                    }
+                }
+            });
+
+            // Dukungan tombol Space untuk navigasi kanvas (standar Figma/Canva)
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space' && !state.isSpacePressed && !e.target.closest('input, textarea, [contenteditable="true"]')) {
+                    state.isSpacePressed = true;
+                    if (!state.isPanning) containerElement.style.cursor = 'grab';
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (e.code === 'Space') {
+                    state.isSpacePressed = false;
+                    if (!state.isPanning) containerElement.style.cursor = 'default';
                 }
             });
 
@@ -1128,11 +1789,21 @@ window.DiagramCanvas = (function () {
             const containerWidth = containerElement.clientWidth || 1000;
             const containerHeight = containerElement.clientHeight || 700;
 
-            const padding = 100;
-            const scaleX = (containerWidth - padding * 2) / bboxWidth;
-            const scaleY = (containerHeight - padding * 2) / bboxHeight;
+            const padding = 60;
+            const availableW = Math.max(200, containerWidth - padding * 2);
+            const availableH = Math.max(200, containerHeight - padding * 2);
 
-            const targetZoom = Math.min(Math.max(Math.min(scaleX, scaleY), 0.3), 1.15);
+            const scaleX = availableW / bboxWidth;
+            const scaleY = availableH / bboxHeight;
+            const optimalScale = Math.min(scaleX, scaleY);
+
+            // Skala target agar seluruh diagram muat di layar dengan proporsi sempurna
+            let targetZoom;
+            if (optimalScale >= 1.0) {
+                targetZoom = 1.0;
+            } else {
+                targetZoom = Math.min(Math.max(optimalScale * 0.98, 0.15), 1.0);
+            }
             state.zoom = parseFloat(targetZoom.toFixed(2));
 
             state.panX = Math.round((containerWidth - bboxWidth * state.zoom) / 2 - minX * state.zoom);
@@ -1162,8 +1833,12 @@ window.DiagramCanvas = (function () {
             autoFit();
         }
 
-        function relayout() {
-            state.nodePositions = DiagramLayout.computeLayout(state.classes, state.relations);
+        function relayout(algorithm = null) {
+            if (algorithm) {
+                state.currentAlgorithm = algorithm;
+            }
+            state.savedLayoutData = null;
+            state.nodePositions = DiagramLayout.computeLayout(state.classes, state.relations, state.currentAlgorithm);
             renderNodeElements();
             measureActualNodeDimensions();
             updateConnectors();
@@ -1356,11 +2031,91 @@ window.DiagramCanvas = (function () {
             state.classes = state.classes.filter(c => c.id !== classId && c.name !== classId);
             state.relations = state.relations.filter(r => r.source !== classId && r.target !== classId);
             state.nodePositions.delete(classId);
+            state.selectedNodeIds.delete(classId);
+            if (state.selectedNodeId === classId) {
+                state.selectedNodeId = state.selectedNodeIds.size > 0 ? Array.from(state.selectedNodeIds)[0] : null;
+            }
 
             syncToCode();
             renderNodeElements();
             measureActualNodeDimensions(false);
             updateConnectors();
+        }
+
+        /**
+         * Hapus banyak kelas sekaligus (multi-item delete)
+         */
+        function deleteClasses(classIds) {
+            if (!classIds || classIds.length === 0) return;
+            const idSet = new Set(classIds);
+            state.classes = state.classes.filter(c => !idSet.has(c.id) && !idSet.has(c.name));
+            state.relations = state.relations.filter(r => !idSet.has(r.source) && !idSet.has(r.target));
+            idSet.forEach(id => {
+                state.nodePositions.delete(id);
+                state.selectedNodeIds.delete(id);
+            });
+            state.selectedNodeId = state.selectedNodeIds.size > 0 ? Array.from(state.selectedNodeIds)[0] : null;
+
+            syncToCode();
+            renderNodeElements();
+            measureActualNodeDimensions(false);
+            updateConnectors();
+        }
+
+        /**
+         * Hapus relasi tertentu
+         */
+        function deleteRelation(rel) {
+            if (!rel) return;
+            state.relations = state.relations.filter(r => !isSameRelation(r, rel));
+            state.selectedRelation = null;
+
+            syncToCode();
+            updateConnectors();
+        }
+
+        /**
+         * Duplikat kelas yang ada
+         */
+        function duplicateClass(classId) {
+            const cls = state.classes.find(c => c.id === classId || c.name === classId);
+            if (!cls) return;
+
+            let counter = 1;
+            let newName = cls.name + 'Copy';
+            while (state.classes.some(c => c.name.toLowerCase() === newName.toLowerCase())) {
+                counter++;
+                newName = cls.name + 'Copy' + counter;
+            }
+
+            const newId = newName;
+            const newAttributes = (cls.attributes || []).map(a => Object.assign({}, a));
+            const newMethods = (cls.methods || []).map(m => Object.assign({}, m));
+
+            const curPos = state.nodePositions.get(cls.id) || { x: 100, y: 100, width: 260, height: 160 };
+            const newPos = {
+                x: curPos.x + 40,
+                y: curPos.y + 40,
+                width: curPos.width,
+                height: curPos.height
+            };
+
+            const newClass = {
+                id: newId,
+                name: newName,
+                stereotype: cls.stereotype || null,
+                attributes: newAttributes,
+                methods: newMethods
+            };
+
+            state.classes.push(newClass);
+            state.nodePositions.set(newId, newPos);
+
+            syncToCode();
+            renderNodeElements();
+            measureActualNodeDimensions(false);
+            updateConnectors();
+            selectNode(newId);
         }
 
         /**
@@ -1463,9 +2218,21 @@ window.DiagramCanvas = (function () {
             setLocked: setLocked,
             toggleLock: toggleLock,
             isLocked: isLocked,
+            resetLayout: () => { state.savedLayoutData = null; },
+            getAlgorithm: () => state.currentAlgorithm,
+            setAlgorithm: (algo) => relayout(algo),
+            relayout: relayout,
             onCodeChange: (cb) => { state.onCodeChange = cb; },
             onPositionChange: (cb) => { state.onPositionChange = cb; },
             onUpdate: (cb) => { state.onUpdate = cb; },
+            onSelect: (cb) => { state.onSelect = cb; },
+            selectNode: selectNode,
+            setMultiSelection: setMultiSelection,
+            selectRelation: selectRelation,
+            clearSelection: clearSelection,
+            getSelectedNode: () => state.selectedNodeId,
+            getSelectedNodes: () => Array.from(state.selectedNodeIds),
+            getSelectedRelation: () => state.selectedRelation,
             getState: () => state
         };
     }

@@ -15,12 +15,12 @@ require_once __DIR__ . '/../layouts/header.php';
                 <span class="brand-text">Greyagram</span>
             </a>
 
-            <button type="button" class="btn btn-outline toolbar-btn active" id="btnTogglePalette" title="Buka / Tutup Palet Komponen Kelas (Manual Builder)">
+            <button type="button" class="btn btn-outline toolbar-btn active" id="btnTogglePalette" title="Buka / Tutup Palet Komponen Kelas">
                 <i class="fa-solid fa-shapes"></i>
                 <span class="btn-text">Komponen</span>
             </button>
 
-            <button type="button" class="btn btn-outline toolbar-btn" id="btnToggleEditor" title="Buka / Tutup Editor Kode Mermaid">
+            <button type="button" class="btn btn-outline toolbar-btn active" id="btnToggleEditor" title="Buka / Tutup Editor Kode Mermaid">
                 <i class="fa-solid fa-code"></i>
                 <span class="btn-text">Kode</span>
             </button>
@@ -28,11 +28,11 @@ require_once __DIR__ . '/../layouts/header.php';
             <div class="template-selector-wrap">
                 <label for="templateSelect" class="sr-only">Pilih Template</label>
                 <select id="templateSelect" class="form-control form-control-sm template-select">
-                    <option value="ecommerce">Template: E-Commerce System</option>
-                    <option value="attendance">Template: HR & Presensi (Kompleks)</option>
-                    <option value="auth">Template: User & Authentication</option>
-                    <option value="school">Template: School & Academic</option>
-                    <option value="hospital">Template: Hospital & Healthcare</option>
+                    <option value="ecommerce">E-Commerce</option>
+                    <option value="attendance">HR & Presensi</option>
+                    <option value="auth">User & Auth</option>
+                    <option value="school">Akademik</option>
+                    <option value="hospital">Kesehatan</option>
                 </select>
             </div>
 
@@ -43,12 +43,12 @@ require_once __DIR__ . '/../layouts/header.php';
                 <span class="btn-text">Proyek</span>
             </a>
 
-            <button type="button" class="btn btn-outline toolbar-btn" id="btnOpenDiagrams" title="Buka Diagram Tersimpan Anda di Database">
+            <button type="button" class="btn btn-outline toolbar-btn" id="btnOpenDiagrams" title="Buka Diagram Tersimpan">
                 <i class="fa-solid fa-folder-open"></i>
                 <span class="btn-text">Buka</span>
             </button>
 
-            <button type="button" class="btn btn-outline toolbar-btn" id="btnSaveDiagram" title="Simpan Diagram ke Database Per User">
+            <button type="button" class="btn btn-outline toolbar-btn" id="btnSaveDiagram" title="Simpan Diagram ke Database">
                 <i class="fa-solid fa-floppy-disk"></i>
                 <span class="btn-text">Simpan</span>
             </button>
@@ -93,114 +93,243 @@ require_once __DIR__ . '/../layouts/header.php';
 
             <button type="button" class="btn btn-outline toolbar-btn" id="btnAutoFit" title="Sesuaikan Tampilan ke Tengah Layar">
                 <i class="fa-solid fa-expand"></i>
-                <span class="btn-text">Autofit</span>
+                <span class="btn-text">Fit</span>
             </button>
 
-            <button type="button" class="btn btn-outline toolbar-btn" id="btnRelayout" title="Rapikan Tata Letak Presisi & Sejajar Vertikal">
-                <i class="fa-solid fa-wand-magic-sparkles"></i>
-                <span class="btn-text">Tata Presisi</span>
-            </button>
+            <div class="dropdown-auto-arrange-wrap" id="wrapAutoArrange">
+                <button type="button" class="btn btn-outline toolbar-btn" id="btnRelayout" title="Pilih Algoritma Tata Letak Otomatis (Rapikan)">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span class="btn-text">Rapikan</span>
+                    <i class="fa-solid fa-chevron-down caret-mini"></i>
+                </button>
 
-            <button type="button" class="btn btn-outline toolbar-btn" id="btnExportSvg" title="Unduh Diagram sebagai Berkas Vektor SVG (Resolusi Tak Terbatas)">
+                <!-- Popover Algoritma Tata Letak dbdiagram.io -->
+                <div class="auto-arrange-popover" id="popoverAutoArrange" style="display: none;">
+                    <div class="popover-header">
+                        <span>Choose auto arrange algorithm</span>
+                        <button type="button" class="btn-close-popover" id="btnCloseArrangePopover" title="Tutup">&times;</button>
+                    </div>
+                    <div class="popover-body">
+                        <!-- 1. Left-right -->
+                        <div class="arrange-option" data-algo="left-right" tabindex="0">
+                            <div class="arrange-icon">
+                                <i class="fa-solid fa-diagram-next"></i>
+                            </div>
+                            <div class="arrange-content">
+                                <div class="arrange-title">Left-right</div>
+                                <div class="arrange-desc">Arrange tables left to right following their foreign-key relationships. Best for schemas with long relationship chains.</div>
+                            </div>
+                            <div class="arrange-badge">1</div>
+                        </div>
+
+                        <!-- 2. Pipeline -->
+                        <div class="arrange-option" data-algo="pipeline" tabindex="0">
+                            <div class="arrange-icon">
+                                <i class="fa-solid fa-link"></i>
+                            </div>
+                            <div class="arrange-content">
+                                <div class="arrange-title">Pipeline</div>
+                                <div class="arrange-desc">Arrange tables left to right along their data-dependency lineage. Table groups become stages ordered left to right, with their tables stacked vertically.</div>
+                            </div>
+                            <div class="arrange-badge">2</div>
+                        </div>
+
+                        <!-- 3. Snowflake -->
+                        <div class="arrange-option" data-algo="snowflake" tabindex="0">
+                            <div class="arrange-icon">
+                                <i class="fa-solid fa-snowflake"></i>
+                            </div>
+                            <div class="arrange-content">
+                                <div class="arrange-title">Snowflake</div>
+                                <div class="arrange-desc">Arrange tables in a snowflake shape, with the most connected tables in the center. Ideal for densely connected diagrams like data warehouses.</div>
+                            </div>
+                            <div class="arrange-badge">3</div>
+                        </div>
+
+                        <!-- 4. Compact (Default) -->
+                        <div class="arrange-option active" data-algo="compact" tabindex="0">
+                            <div class="arrange-icon">
+                                <i class="fa-solid fa-table-cells-large"></i>
+                            </div>
+                            <div class="arrange-content">
+                                <div class="arrange-title">Compact</div>
+                                <div class="arrange-desc">Arrange tables in a compact rectangle layout. Ideal for diagrams with few relationships and tables.</div>
+                            </div>
+                            <div class="arrange-badge">4</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-outline toolbar-btn" id="btnExportSvg" title="Unduh Diagram sebagai Berkas Vektor SVG">
                 <i class="fa-solid fa-bezier-curve"></i>
-                <span class="btn-text">Unduh SVG</span>
+                <span class="btn-text">SVG</span>
             </button>
 
-            <button type="button" class="btn btn-primary toolbar-btn" id="btnExportPng" title="Unduh Diagram sebagai Citra PNG Ultra-HD 4K (Sangat Tajam & Tidak Blur)">
+            <button type="button" class="btn btn-primary toolbar-btn" id="btnExportPng" title="Unduh Diagram sebagai Citra PNG Ultra-HD">
                 <i class="fa-solid fa-download"></i>
-                <span class="btn-text">Unduh PNG (HD)</span>
+                <span class="btn-text">PNG</span>
             </button>
         </div>
     </header>
 
-    <!-- Workspace Area (Left Palette Drawer + Editor Drawer + Canvas) -->
+    <!-- Workspace Area (Left Palette Drawer + Center Canvas + Right Editor Drawer) -->
     <div class="diagram-workspace-container">
-        <!-- Left Component Palette Drawer (Tambah Class Secara Manual & Drag-and-Drop) -->
+        <!-- 1. LEFT: Palet Komponen Kelas (Preview Visual Mini-Card, Drag & Drop, Expandable with Angle Toggle) -->
         <aside class="diagram-palette-drawer" id="diagramPaletteDrawer">
+            <div class="drawer-resizer resizer-right" id="paletteResizer" title="Tarik untuk mengubah lebar palet komponen"></div>
+
             <div class="palette-drawer-header">
                 <div class="palette-title">
                     <i class="fa-solid fa-shapes"></i>
                     <span>Komponen Kelas</span>
                 </div>
-                <button type="button" class="drawer-close-btn" id="btnCollapsePalette" title="Sembunyikan Palet">
-                    <i class="fa-solid fa-chevron-left"></i>
+                <button type="button" class="drawer-angle-btn" id="btnCollapsePalette" title="Sembunyikan Palet (Angle Left)">
+                    <i class="fa-solid fa-angle-left"></i>
                 </button>
             </div>
 
             <div class="palette-drawer-body">
-                <p class="palette-hint">Drag & drop ke lembar kerja atau klik ikon <b>+</b> untuk menambahkan kelas baru.</p>
+                <p class="palette-hint">Tarik kartu preview langsung ke lembar kerja.</p>
 
-                <div class="palette-item-card" draggable="true" data-type="class" title="Tarik atau klik untuk menambah Class standar">
-                    <div class="palette-item-icon bg-class">
-                        <i class="fa-solid fa-cube"></i>
+                <!-- 1. Mini Card Preview: Class Standar -->
+                <div class="palette-preview-card" draggable="true" data-type="class" title="Tarik ke kanvas untuk menambah Class standar">
+                    <div class="mini-card-header header-class">
+                        <span class="mini-card-icon"><i class="fa-solid fa-cube"></i></span>
+                        <span class="mini-card-title">User</span>
                     </div>
-                    <div class="palette-item-info">
-                        <div class="palette-item-name">Class Standar</div>
-                        <div class="palette-item-desc">Entitas kelas reguler dengan atribut & metode</div>
+                    <div class="mini-card-section">
+                        <div class="mini-card-line"><span class="mini-vis text-public">+</span> <span class="mini-field">id</span>: <span class="mini-type">int</span></div>
+                        <div class="mini-card-line"><span class="mini-vis text-public">+</span> <span class="mini-field">name</span>: <span class="mini-type">string</span></div>
                     </div>
-                    <button type="button" class="btn-palette-add" title="Tambah Langsung ke Tengah Lembar Kerja">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
+                    <div class="mini-card-section mini-methods">
+                        <div class="mini-card-line"><span class="mini-vis text-public">+</span> <span class="mini-method">login()</span></div>
+                    </div>
+                    <div class="mini-card-drag-hint">
+                        <i class="fa-solid fa-hand-pointer"></i> Drag ke Kanvas
+                    </div>
                 </div>
 
-                <div class="palette-item-card" draggable="true" data-type="interface" title="Tarik atau klik untuk menambah Interface">
-                    <div class="palette-item-icon bg-interface">
-                        <i class="fa-solid fa-circle-nodes"></i>
+                <!-- 2. Mini Card Preview: <<interface>> -->
+                <div class="palette-preview-card" draggable="true" data-type="interface" title="Tarik ke kanvas untuk menambah Interface">
+                    <div class="mini-card-header header-interface">
+                        <span class="mini-card-stereotype">&lt;&lt;interface&gt;&gt;</span>
+                        <div class="mini-card-title-row">
+                            <span class="mini-card-icon"><i class="fa-solid fa-circle-nodes"></i></span>
+                            <span class="mini-card-title">IAuthService</span>
+                        </div>
                     </div>
-                    <div class="palette-item-info">
-                        <div class="palette-item-name">&lt;&lt;interface&gt;&gt;</div>
-                        <div class="palette-item-desc">Kontrak antarmuka metode tanpa implementasi</div>
+                    <div class="mini-card-section mini-methods">
+                        <div class="mini-card-line"><span class="mini-vis text-public">+</span> <span class="mini-method">authenticate()</span></div>
+                        <div class="mini-card-line"><span class="mini-vis text-public">+</span> <span class="mini-method">validateToken()</span></div>
                     </div>
-                    <button type="button" class="btn-palette-add" title="Tambah Langsung ke Tengah Lembar Kerja">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
+                    <div class="mini-card-drag-hint">
+                        <i class="fa-solid fa-hand-pointer"></i> Drag ke Kanvas
+                    </div>
                 </div>
 
-                <div class="palette-item-card" draggable="true" data-type="abstract" title="Tarik atau klik untuk menambah Abstract Class">
-                    <div class="palette-item-icon bg-abstract">
-                        <i class="fa-solid fa-diagram-nested"></i>
+                <!-- 3. Mini Card Preview: <<abstract>> -->
+                <div class="palette-preview-card" draggable="true" data-type="abstract" title="Tarik ke kanvas untuk menambah Abstract Class">
+                    <div class="mini-card-header header-abstract">
+                        <span class="mini-card-stereotype">&lt;&lt;abstract&gt;&gt;</span>
+                        <div class="mini-card-title-row">
+                            <span class="mini-card-icon"><i class="fa-solid fa-diagram-nested"></i></span>
+                            <span class="mini-card-title">BaseEntity</span>
+                        </div>
                     </div>
-                    <div class="palette-item-info">
-                        <div class="palette-item-name">&lt;&lt;abstract&gt;&gt;</div>
-                        <div class="palette-item-desc">Kelas abstrak sebagai cetak biru pewarisan</div>
+                    <div class="mini-card-section">
+                        <div class="mini-card-line"><span class="mini-vis text-protected">#</span> <span class="mini-field">id</span>: <span class="mini-type">int</span></div>
+                        <div class="mini-card-line"><span class="mini-vis text-protected">#</span> <span class="mini-field">created_at</span></div>
                     </div>
-                    <button type="button" class="btn-palette-add" title="Tambah Langsung ke Tengah Lembar Kerja">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
+                    <div class="mini-card-section mini-methods">
+                        <div class="mini-card-line"><span class="mini-vis text-public">+</span> <span class="mini-method">save()*</span></div>
+                    </div>
+                    <div class="mini-card-drag-hint">
+                        <i class="fa-solid fa-hand-pointer"></i> Drag ke Kanvas
+                    </div>
                 </div>
 
-                <div class="palette-item-card" draggable="true" data-type="enum" title="Tarik atau klik untuk menambah Enumerasi">
-                    <div class="palette-item-icon bg-enum">
-                        <i class="fa-solid fa-list-check"></i>
+                <!-- 4. Mini Card Preview: <<enum>> -->
+                <div class="palette-preview-card" draggable="true" data-type="enum" title="Tarik ke kanvas untuk menambah Enum">
+                    <div class="mini-card-header header-enum">
+                        <span class="mini-card-stereotype">&lt;&lt;enum&gt;&gt;</span>
+                        <div class="mini-card-title-row">
+                            <span class="mini-card-icon"><i class="fa-solid fa-list-check"></i></span>
+                            <span class="mini-card-title">UserStatus</span>
+                        </div>
                     </div>
-                    <div class="palette-item-info">
-                        <div class="palette-item-name">&lt;&lt;enum&gt;&gt;</div>
-                        <div class="palette-item-desc">Daftar nilai konstanta terdefinisi</div>
+                    <div class="mini-card-section">
+                        <div class="mini-card-line enum-line"><span class="mini-bullet">&bull;</span> ACTIVE</div>
+                        <div class="mini-card-line enum-line"><span class="mini-bullet">&bull;</span> INACTIVE</div>
+                        <div class="mini-card-line enum-line"><span class="mini-bullet">&bull;</span> PENDING</div>
                     </div>
-                    <button type="button" class="btn-palette-add" title="Tambah Langsung ke Tengah Lembar Kerja">
-                        <i class="fa-solid fa-plus"></i>
-                    </button>
+                    <div class="mini-card-drag-hint">
+                        <i class="fa-solid fa-hand-pointer"></i> Drag ke Kanvas
+                    </div>
                 </div>
             </div>
 
             <div class="palette-drawer-footer">
                 <div class="palette-tip">
                     <i class="fa-solid fa-lightbulb"></i>
-                    <span>Klik ganda teks kelas, atribut, atau metode untuk mengedit langsung. Tombol <b>+</b> di kanan bawah baris kartu untuk tambah baris baru.</span>
+                    <span>Tarik kartu ke kanvas atau klik untuk menambahkan di tengah layar.</span>
                 </div>
             </div>
         </aside>
 
-        <!-- Collapsible Code Editor Drawer (Bisa Dibuka Lewat Tombol Kode di Toolbar) -->
-        <aside class="diagram-editor-drawer is-closed" id="diagramEditorDrawer">
+        <!-- 2. CENTER: Canvas Viewport -->
+        <section class="diagram-canvas-area" id="diagramCanvasArea">
+            <!-- Dock Tabs dengan Angle Icon untuk Membuka Kembali Panel yang Di-collapse -->
+            <button type="button" class="drawer-dock-tab dock-tab-left" id="btnDockOpenPalette" style="display: none;" title="Buka Palet Komponen (Angle)">
+                <i class="fa-solid fa-angle-right"></i>
+            </button>
+            <button type="button" class="drawer-dock-tab dock-tab-right" id="btnDockOpenEditor" style="display: none;" title="Buka Editor Kode (Angle)">
+                <i class="fa-solid fa-angle-left"></i>
+            </button>
+
+            <div class="canvas-background"></div>
+
+            <div class="diagram-viewport" id="diagramViewport">
+                <!-- SVG Layer untuk Garis Relasi dan Panah -->
+                <svg id="diagramSvgLayer" class="diagram-svg-layer" xmlns="http://www.w3.org/2000/svg">
+                    <defs></defs>
+                </svg>
+
+                <!-- HTML Layer untuk Kartu Kelas yang Draggable -->
+                <div id="diagramNodesLayer" class="diagram-nodes-layer"></div>
+            </div>
+
+            <!-- Floating Quick Bar (dbdiagram style di pojok kiri bawah kanvas) -->
+            <div class="canvas-bottom-floating-bar" id="canvasBottomBar">
+                <button type="button" class="btn-float-action" id="btnFloatArrange" title="Choose auto arrange algorithm (1-4)">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    <span class="float-action-badge" id="badgeCurrentAlgo">4</span>
+                </button>
+                <div class="float-bar-sep"></div>
+                <button type="button" class="btn-float-action" id="btnFloatFit" title="Fit to screen">
+                    <i class="fa-solid fa-expand"></i>
+                </button>
+            </div>
+
+            <!-- Canvas Floating Instructions / Help -->
+            <div class="canvas-floating-hint">
+                <i class="fa-solid fa-arrows-up-down-left-right"></i>
+                <span>Tarik latar untuk Pan &bull; Drag header kartu untuk geser &bull; Scroll untuk Zoom</span>
+            </div>
+        </section>
+
+        <!-- 3. RIGHT: Editor Kode Mermaid (Expandable with Minimum Width, Angle Toggle, Default Show) -->
+        <aside class="diagram-editor-drawer" id="diagramEditorDrawer">
+            <div class="drawer-resizer resizer-left" id="editorResizer" title="Tarik untuk mengubah lebar editor kode"></div>
+
             <div class="editor-drawer-header">
+                <button type="button" class="drawer-angle-btn" id="btnCloseDrawer" title="Sembunyikan Editor Kode (Angle Right)">
+                    <i class="fa-solid fa-angle-right"></i>
+                </button>
                 <div class="drawer-title">
                     <i class="fa-solid fa-terminal"></i>
                     <span>Sintaks Mermaid (Class)</span>
                 </div>
-                <button type="button" class="drawer-close-btn" id="btnCloseDrawer" title="Tutup Editor">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
             </div>
 
             <div class="editor-drawer-body">
@@ -231,27 +360,6 @@ require_once __DIR__ . '/../layouts/header.php';
                 </button>
             </div>
         </aside>
-
-        <!-- Canvas Viewport -->
-        <section class="diagram-canvas-area" id="diagramCanvasArea">
-            <div class="canvas-background"></div>
-
-            <div class="diagram-viewport" id="diagramViewport">
-                <!-- SVG Layer untuk Garis Relasi dan Panah -->
-                <svg id="diagramSvgLayer" class="diagram-svg-layer" xmlns="http://www.w3.org/2000/svg">
-                    <defs></defs>
-                </svg>
-
-                <!-- HTML Layer untuk Kartu Kelas yang Draggable -->
-                <div id="diagramNodesLayer" class="diagram-nodes-layer"></div>
-            </div>
-
-            <!-- Canvas Floating Instructions / Help -->
-            <div class="canvas-floating-hint">
-                <i class="fa-solid fa-arrows-up-down-left-right"></i>
-                <span>Tarik latar untuk Pan &bull; Drag header kartu untuk geser &bull; Scroll untuk Zoom</span>
-            </div>
-        </section>
     </div>
 
     <!-- Modal Simpan Diagram -->
@@ -603,8 +711,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Render awal saat halaman dimuat (terapkan posisi tersimpan jika ada)
-    compileAndRender(codeInput.value, currentLayoutData ? false : true, currentLayoutData);
+    // Render awal saat halaman dimuat: SELALU fit to screen saat project pertama kali dibuka
+    compileAndRender(codeInput.value, true, currentLayoutData);
+
+    // Jalankan autoFit kembali setelah DOM dan font selesai diproses agar benar-benar presisi
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            canvas.autoFit();
+        }, 120);
+    });
 
     // Event Listener Terapkan Kode
     btnApply.addEventListener('click', () => {
@@ -641,61 +756,95 @@ document.addEventListener('DOMContentLoaded', () => {
         const val = e.target.value;
         if (TEMPLATES[val]) {
             codeInput.value = TEMPLATES[val];
-            compileAndRender(codeInput.value, true);
+            compileAndRender(codeInput.value, true, null);
         }
     });
 
-    // Toggle Drawer Editor
-    function toggleEditor(forceState) {
-        const isMobile = window.innerWidth <= 992;
-        if (isMobile) {
-            const willOpen = (typeof forceState === 'boolean') ? forceState : !editorDrawer.classList.contains('is-open');
-            editorDrawer.classList.toggle('is-open', willOpen);
-            btnToggleEditor.classList.toggle('active', willOpen);
-        } else {
-            const willClose = (typeof forceState === 'boolean') ? !forceState : !editorDrawer.classList.contains('is-closed');
-            editorDrawer.classList.toggle('is-closed', willClose);
-            btnToggleEditor.classList.toggle('active', !willClose);
-            setTimeout(() => {
-                canvas.autoFit();
-            }, 260);
-        }
-    }
-
-    btnToggleEditor.addEventListener('click', () => toggleEditor());
-    btnCloseDrawer.addEventListener('click', () => toggleEditor(false));
-
     // ==========================================
-    // PALET KOMPONEN KELAS & DRAG-AND-DROP
+    // 1. PALET KOMPONEN KELAS (LEFT DRAWER)
     // ==========================================
     const paletteDrawer = document.getElementById('diagramPaletteDrawer');
     const btnTogglePalette = document.getElementById('btnTogglePalette');
     const btnCollapsePalette = document.getElementById('btnCollapsePalette');
+    const btnDockOpenPalette = document.getElementById('btnDockOpenPalette');
+    const paletteResizer = document.getElementById('paletteResizer');
 
-    function togglePalette(forceState) {
+    function setPaletteState(isOpen) {
         if (!paletteDrawer) return;
-        const willCollapse = (typeof forceState === 'boolean') ? !forceState : !paletteDrawer.classList.contains('is-collapsed');
-        paletteDrawer.classList.toggle('is-collapsed', willCollapse);
-        if (btnTogglePalette) btnTogglePalette.classList.toggle('active', !willCollapse);
+        paletteDrawer.classList.toggle('is-collapsed', !isOpen);
+        if (btnTogglePalette) btnTogglePalette.classList.toggle('active', isOpen);
+        if (btnDockOpenPalette) btnDockOpenPalette.style.display = isOpen ? 'none' : 'flex';
+        setTimeout(() => {
+            if (canvas && typeof canvas.updateConnectors === 'function') {
+                canvas.updateConnectors();
+            }
+        }, 260);
     }
 
-    if (btnTogglePalette) btnTogglePalette.addEventListener('click', () => togglePalette());
-    if (btnCollapsePalette) btnCollapsePalette.addEventListener('click', () => togglePalette(false));
+    if (btnTogglePalette) btnTogglePalette.addEventListener('click', () => {
+        setPaletteState(paletteDrawer.classList.contains('is-collapsed'));
+    });
+    if (btnCollapsePalette) btnCollapsePalette.addEventListener('click', () => setPaletteState(false));
+    if (btnDockOpenPalette) btnDockOpenPalette.addEventListener('click', () => setPaletteState(true));
 
-    // Drag-and-drop & Klik dari palet untuk menambah kelas ke kanvas
-    document.querySelectorAll('.palette-item-card').forEach(item => {
-        const type = item.getAttribute('data-type') || 'class';
+    // Resizer Horizontal Palet Komponen (Min-Width 200px, Max-Width 450px)
+    let isResizingPalette = false;
+    if (paletteResizer && paletteDrawer) {
+        paletteResizer.addEventListener('mousedown', (e) => {
+            isResizingPalette = true;
+            paletteResizer.classList.add('is-resizing');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
 
-        // Klik tombol + atau kartu untuk langsung membuat di tengah layar kanvas
-        item.addEventListener('click', (e) => {
+            const startX = e.clientX;
+            const startW = paletteDrawer.offsetWidth;
+
+            function onMouseMove(moveEvent) {
+                if (!isResizingPalette) return;
+                const newW = Math.max(200, Math.min(450, startW + (moveEvent.clientX - startX)));
+                paletteDrawer.style.width = newW + 'px';
+                paletteDrawer.style.minWidth = newW + 'px';
+                if (canvas && typeof canvas.updateConnectors === 'function') {
+                    canvas.updateConnectors();
+                }
+            }
+
+            function onMouseUp() {
+                isResizingPalette = false;
+                paletteResizer.classList.remove('is-resizing');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+                if (canvas && typeof canvas.updateConnectors === 'function') {
+                    canvas.updateConnectors();
+                }
+            }
+
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+    }
+
+    // Drag-and-drop & Klik dari Mini-Card Preview
+    document.querySelectorAll('.palette-preview-card').forEach(card => {
+        const type = card.getAttribute('data-type') || 'class';
+
+        // Klik kartu untuk instan menambah di tengah kanvas
+        card.addEventListener('click', () => {
             canvas.addClass(type);
             showToast(`Kelas ${type} berhasil ditambahkan.`);
         });
 
-        // Drag start: simpan tipe kelas di dataTransfer
-        item.addEventListener('dragstart', (e) => {
+        // Drag start: simpan tipe kelas
+        card.addEventListener('dragstart', (e) => {
+            card.classList.add('is-dragging');
             e.dataTransfer.setData('text/plain', type);
             e.dataTransfer.effectAllowed = 'copy';
+        });
+
+        card.addEventListener('dragend', () => {
+            card.classList.remove('is-dragging');
         });
     });
 
@@ -718,6 +867,77 @@ document.addEventListener('DOMContentLoaded', () => {
 
             canvas.addClass(type, null, dropX, dropY);
             showToast(`Kelas ${type} berhasil ditambahkan di posisi kursor.`);
+        });
+    }
+
+    // ==========================================
+    // 2. EDITOR KODE MERMAID (RIGHT DRAWER)
+    // ==========================================
+    // Catatan: editorDrawer, btnToggleEditor, btnCloseDrawer sudah diinisialisasi di atas
+    const btnDockOpenEditor = document.getElementById('btnDockOpenEditor');
+    const editorResizer = document.getElementById('editorResizer');
+
+    function setEditorState(isOpen) {
+        if (!editorDrawer) return;
+        const isMobile = window.innerWidth <= 992;
+        if (isMobile) {
+            editorDrawer.classList.toggle('is-open', isOpen);
+        } else {
+            editorDrawer.classList.toggle('is-closed', !isOpen);
+        }
+        if (btnToggleEditor) btnToggleEditor.classList.toggle('active', isOpen);
+        if (btnDockOpenEditor) btnDockOpenEditor.style.display = isOpen ? 'none' : 'flex';
+        setTimeout(() => {
+            if (canvas && typeof canvas.updateConnectors === 'function') {
+                canvas.updateConnectors();
+            }
+        }, 260);
+    }
+
+    if (btnToggleEditor) btnToggleEditor.addEventListener('click', () => {
+        const isClosed = editorDrawer.classList.contains('is-closed') || (window.innerWidth <= 992 && !editorDrawer.classList.contains('is-open'));
+        setEditorState(isClosed);
+    });
+    if (btnCloseDrawer) btnCloseDrawer.addEventListener('click', () => setEditorState(false));
+    if (btnDockOpenEditor) btnDockOpenEditor.addEventListener('click', () => setEditorState(true));
+
+    // Resizer Horizontal Editor Kode (Min-Width 280px, Max-Width 650px)
+    let isResizingEditor = false;
+    if (editorResizer && editorDrawer) {
+        editorResizer.addEventListener('mousedown', (e) => {
+            isResizingEditor = true;
+            editorResizer.classList.add('is-resizing');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+
+            const startX = e.clientX;
+            const startW = editorDrawer.offsetWidth;
+
+            function onMouseMove(moveEvent) {
+                if (!isResizingEditor) return;
+                // Geser ke kiri memperlebar editor di sisi kanan
+                const newW = Math.max(280, Math.min(650, startW + (startX - moveEvent.clientX)));
+                editorDrawer.style.width = newW + 'px';
+                editorDrawer.style.minWidth = newW + 'px';
+                if (canvas && typeof canvas.updateConnectors === 'function') {
+                    canvas.updateConnectors();
+                }
+            }
+
+            function onMouseUp() {
+                isResizingEditor = false;
+                editorResizer.classList.remove('is-resizing');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+                if (canvas && typeof canvas.updateConnectors === 'function') {
+                    canvas.updateConnectors();
+                }
+            }
+
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
         });
     }
 
@@ -789,9 +1009,141 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    // ==========================================
+    // AUTO ARRANGE ALGORITHM (dbdiagram.io Grade)
+    // ==========================================
+    const popoverAutoArrange = document.getElementById('popoverAutoArrange');
+    const btnCloseArrangePopover = document.getElementById('btnCloseArrangePopover');
+    const btnFloatArrange = document.getElementById('btnFloatArrange');
+    const btnFloatFit = document.getElementById('btnFloatFit');
+    const badgeCurrentAlgo = document.getElementById('badgeCurrentAlgo');
+    const arrangeOptions = document.querySelectorAll('.arrange-option');
+
+    const ALGO_MAP = {
+        '1': 'left-right',
+        '2': 'pipeline',
+        '3': 'snowflake',
+        '4': 'compact'
+    };
+
+    const ALGO_NAMES = {
+        'left-right': 'Left-right',
+        'pipeline': 'Pipeline',
+        'snowflake': 'Snowflake',
+        'compact': 'Compact'
+    };
+
+    // Pindahkan popover ke body agar tidak pernah terpotong overflow toolbar
+    if (popoverAutoArrange && popoverAutoArrange.parentNode !== document.body) {
+        document.body.appendChild(popoverAutoArrange);
+    }
+
+    function toggleArrangePopover(forceState, triggerBtn = null) {
+        if (!popoverAutoArrange) return;
+        const shouldShow = forceState !== undefined ? forceState : (popoverAutoArrange.style.display === 'none');
+        
+        if (shouldShow) {
+            popoverAutoArrange.style.display = 'block';
+            const btn = triggerBtn || btnRelayout || btnFloatArrange;
+            if (btn) {
+                const rect = btn.getBoundingClientRect();
+                if (btn === btnFloatArrange) {
+                    popoverAutoArrange.style.top = 'auto';
+                    popoverAutoArrange.style.bottom = (window.innerHeight - rect.top + 8) + 'px';
+                    popoverAutoArrange.style.left = Math.max(10, rect.left) + 'px';
+                    popoverAutoArrange.style.right = 'auto';
+                } else {
+                    popoverAutoArrange.style.top = (rect.bottom + 6) + 'px';
+                    popoverAutoArrange.style.bottom = 'auto';
+                    popoverAutoArrange.style.right = Math.max(10, window.innerWidth - rect.right) + 'px';
+                    popoverAutoArrange.style.left = 'auto';
+                }
+            }
+        } else {
+            popoverAutoArrange.style.display = 'none';
+        }
+        if (btnRelayout) btnRelayout.classList.toggle('active', shouldShow);
+    }
+
+    if (btnRelayout) {
+        btnRelayout.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleArrangePopover(undefined, btnRelayout);
+        });
+    }
+
+    if (btnFloatArrange) {
+        btnFloatArrange.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleArrangePopover(undefined, btnFloatArrange);
+        });
+    }
+
+    if (btnCloseArrangePopover) {
+        btnCloseArrangePopover.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleArrangePopover(false);
+        });
+    }
+
+    if (btnFloatFit) {
+        btnFloatFit.addEventListener('click', () => canvas.autoFit());
+    }
+
+    function applyArrangeAlgorithm(algo) {
+        if (!algo) return;
+        arrangeOptions.forEach(opt => {
+            const isMatch = opt.getAttribute('data-algo') === algo;
+            opt.classList.toggle('active', isMatch);
+        });
+
+        // Update badge angka algoritma aktif
+        let badgeNum = '1';
+        if (algo === 'pipeline') badgeNum = '2';
+        else if (algo === 'snowflake') badgeNum = '3';
+        else if (algo === 'compact') badgeNum = '4';
+        if (badgeCurrentAlgo) badgeCurrentAlgo.textContent = badgeNum;
+
+        canvas.relayout(algo);
+        toggleArrangePopover(false);
+        showToast(`Tata letak ${ALGO_NAMES[algo] || algo} berhasil diterapkan.`);
+    }
+
+    arrangeOptions.forEach(opt => {
+        opt.addEventListener('click', () => {
+            const algo = opt.getAttribute('data-algo');
+            applyArrangeAlgorithm(algo);
+        });
+    });
+
+    // Keyboard shortcut (1, 2, 3, 4 saat popover terbuka, atau Escape untuk tutup)
+    window.addEventListener('keydown', (e) => {
+        if (e.target.closest('input, textarea, select')) return;
+
+        if (popoverAutoArrange && popoverAutoArrange.style.display !== 'none') {
+            if (e.key === 'Escape') {
+                toggleArrangePopover(false);
+                return;
+            }
+            if (ALGO_MAP[e.key]) {
+                e.preventDefault();
+                applyArrangeAlgorithm(ALGO_MAP[e.key]);
+                return;
+            }
+        }
+    });
+
+    // Klik di luar popover untuk menutup otomatis
+    document.addEventListener('click', (e) => {
+        if (popoverAutoArrange && popoverAutoArrange.style.display !== 'none') {
+            if (!e.target.closest('#wrapAutoArrange') && !e.target.closest('#btnFloatArrange') && !e.target.closest('#popoverAutoArrange')) {
+                toggleArrangePopover(false);
+            }
+        }
+    });
+
     // Kontrol Navigasi Kanvas
     btnAutoFit.addEventListener('click', () => canvas.autoFit());
-    btnRelayout.addEventListener('click', () => canvas.relayout());
     btnZoomIn.addEventListener('click', () => canvas.zoomIn());
     btnZoomOut.addEventListener('click', () => canvas.zoomOut());
     btnZoomReset.addEventListener('click', () => canvas.resetZoom());
@@ -1142,7 +1494,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     } catch(e) {}
                 }
                 currentLayoutData = loadedLayout;
-                compileAndRender(res.diagram.code, loadedLayout ? false : true, loadedLayout);
+                compileAndRender(res.diagram.code, true, loadedLayout);
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        canvas.autoFit();
+                    }, 120);
+                });
                 updateSaveStatus('saved', 'Tersimpan');
 
                 const newUrl = '<?= base_url('diagram') ?>?id=' + res.diagram.id;
@@ -1208,6 +1565,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (TEMPLATES.ecommerce) {
                 codeInput.value = TEMPLATES.ecommerce;
                 compileAndRender(codeInput.value, true, null);
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        canvas.autoFit();
+                    }, 120);
+                });
             }
 
             closeModal(modalList);

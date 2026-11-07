@@ -7,6 +7,53 @@ window.DiagramParser = (function () {
     'use strict';
 
     /**
+     * Parse satu baris anggota kelas (atribut / metode / stereotipe)
+     * @param {string} rawMember 
+     * @returns {Object|null}
+     */
+    function parseMember(rawMember) {
+        let str = (rawMember || '').trim();
+        if (!str) return null;
+
+        // Cek stereotipe dalam blok (misal: <<interface>> atau <<Interface>>)
+        const annoMatch = str.match(/^<<([a-zA-Z0-9_]+)>>$/i);
+        if (annoMatch) {
+            return { type: 'stereotype', value: annoMatch[1] };
+        }
+
+        // Visibilitas: + (public), - (private), # (protected), ~ (package/internal)
+        let visibility = 'public';
+        let icon = '+';
+        if (str.startsWith('+')) {
+            visibility = 'public';
+            icon = '+';
+            str = str.substring(1).trim();
+        } else if (str.startsWith('-')) {
+            visibility = 'private';
+            icon = '-';
+            str = str.substring(1).trim();
+        } else if (str.startsWith('#')) {
+            visibility = 'protected';
+            icon = '#';
+            str = str.substring(1).trim();
+        } else if (str.startsWith('~')) {
+            visibility = 'package';
+            icon = '~';
+            str = str.substring(1).trim();
+        }
+
+        // Bedakan method vs attribute berdasarkan keberadaan tanda ()
+        const isMethod = str.includes('(') && str.includes(')');
+
+        return {
+            type: isMethod ? 'method' : 'attribute',
+            visibility: visibility,
+            icon: icon,
+            text: str
+        };
+    }
+
+    /**
      * Parse kode Mermaid Class Diagram menjadi model objek terstruktur
      * @param {string} code 
      * @returns {{classes: Array, relations: Array, errors: Array}}
@@ -57,48 +104,6 @@ window.DiagramParser = (function () {
                 });
             }
             return classMap.get(cleanName);
-        }
-
-        function parseMember(rawMember) {
-            let str = rawMember.trim();
-            if (!str) return null;
-
-            // Cek stereotipe dalam blok (misal: <<interface>> atau <<Interface>>)
-            const annoMatch = str.match(/^<<([a-zA-Z0-9_]+)>>$/i);
-            if (annoMatch) {
-                return { type: 'stereotype', value: annoMatch[1] };
-            }
-
-            // Visibilitas: + (public), - (private), # (protected), ~ (package/internal)
-            let visibility = 'public';
-            let icon = '+';
-            if (str.startsWith('+')) {
-                visibility = 'public';
-                icon = '+';
-                str = str.substring(1).trim();
-            } else if (str.startsWith('-')) {
-                visibility = 'private';
-                icon = '-';
-                str = str.substring(1).trim();
-            } else if (str.startsWith('#')) {
-                visibility = 'protected';
-                icon = '#';
-                str = str.substring(1).trim();
-            } else if (str.startsWith('~')) {
-                visibility = 'package';
-                icon = '~';
-                str = str.substring(1).trim();
-            }
-
-            // Bedakan method vs attribute berdasarkan keberadaan tanda ()
-            const isMethod = str.includes('(') && str.includes(')');
-
-            return {
-                type: isMethod ? 'method' : 'attribute',
-                visibility: visibility,
-                icon: icon,
-                text: str
-            };
         }
 
         for (let i = 0; i < lines.length; i++) {

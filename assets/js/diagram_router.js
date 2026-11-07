@@ -1,23 +1,22 @@
 /**
- * Greyagram - Professional Visio/DBDiagram-Quality Orthogonal Router
- * Menghasilkan rute konektor ortogonal kelas industri (setara Microsoft Visio / dbdiagram.io / draw.io).
+ * Greyagram - Professional DBDiagram / ERD-Grade Orthogonal Router
+ * Menghasilkan rute konektor ortogonal kelas industri (setara dbdiagram.io / DBeaver / draw.io).
  *
- * Jaminan Kualitas Visio & dbdiagram.io:
- * 1. Panah relasi hierarki vertikal (turun) SELALU masuk dari ATAS (top) dan mengarah tegak lurus ke BAWAH.
- * 2. Garis konektor TIDAK PERNAH memotong atau menempel di sisi/border kartu manapun (Zero Obstacle Collision).
- * 3. Jika dua kartu di baris yang sama dipisahkan kartu lain, rute melambung di koridor atas dan panah masuk dari ATAS.
- * 4. Jalur horizontal dialokasikan pada Multi-Track Corridor terpisah (anti-tumpuk) dengan elevasi Y unik.
- * 5. Multi-Port otomatis mendistribusikan titik masuk/keluar secara merata pada kartu.
- * 6. Anti-tumpuk teks label dengan deteksi tabrakan koordinat.
+ * Jaminan Kualitas dbdiagram.io:
+ * 1. Menghubungkan antarentitas dengan jalur ortogonal alami (Right-to-Left, Left-to-Right, atau Bottom-to-Top).
+ * 2. Tidak ada garis aneh yang melambung ke langit-langit (overhead wires) atau memotong badan kartu sendiri.
+ * 3. Multi-Track Corridor otomatis mencegah garis-garis paralel tumpang tindih.
+ * 4. Multi-Port Slotting mendistribusikan titik masuk/keluar secara proporsional di sepanjang tepi kartu.
+ * 5. Teks label relasi dan badge kardinalitas anti-tumpuk dengan deteksi bounding-box.
  */
 
 window.DiagramRouter = (function () {
     'use strict';
 
-    const STUB_LENGTH = 24;     // Panjang jalur tegak lurus wajib keluar/masuk kartu (menjamin panah dari atas)
-    const CORNER_RADIUS = 8;    // Radius lengkungan belokan 90 derajat
-    const TRACK_SPACING = 18;   // Jarak elevasi antar jalur paralel di koridor yang sama (anti-tumpuk)
-    const CARD_CLEARANCE = 20;  // Jarak bebas aman dari tepi kartu
+    const STUB_LENGTH = 18;      // Jarak minimum keluar/masuk tegak lurus dari kartu
+    const CORNER_RADIUS = 8;     // Radius kehalusan lengkungan belokan 90 derajat (dbdiagram.io grade)
+    const TRACK_SPACING = 12;    // Jarak elevasi antarjalur paralel di koridor yang sama (offset ±12px sesuai node_line.md)
+    const CARD_CLEARANCE = 12;   // Jarak bebas aman dari tepi kartu lain
 
     /**
      * Hitung seluruh rute konektor untuk semua relasi
@@ -46,13 +45,13 @@ window.DiagramRouter = (function () {
             });
         });
 
-        // 2. Tentukan orientasi sisi koneksi seperti Visio / dbdiagram.io
+        // 2. Tentukan orientasi sisi koneksi alami setara dbdiagram.io
         const resolvedRelations = relations.map(rel => {
             const posA = nodePositions.get(rel.source);
             const posB = nodePositions.get(rel.target);
             if (!posA || !posB) return null;
 
-            const sides = determineVisioSides(posA, posB, rel, allBoxes);
+            const sides = determineDbDiagramSides(posA, posB, rel);
             return {
                 rel: rel,
                 sourcePos: posA,
@@ -65,8 +64,8 @@ window.DiagramRouter = (function () {
         // 3. Alokasikan Slot Port pada setiap kartu agar garis tidak bertumpuk di satu titik
         const portAssignments = assignPortSlots(resolvedRelations);
 
-        // 4. Tracker koridor horizontal multi-track agar garis tidak tumpang tindih
-        const corridorTracks = new Map(); // key: corridor band -> counter
+        // 4. Tracker koridor horizontal & vertikal multi-track agar garis tidak tumpang tindih
+        const corridorTracks = new Map();
 
         // 5. Tracker posisi label untuk mencegah tabrakan teks label
         const placedLabels = [];
@@ -76,7 +75,7 @@ window.DiagramRouter = (function () {
             const p1 = portAssignments.get(item.rel.id + '_source');
             const p2 = portAssignments.get(item.rel.id + '_target');
 
-            const waypoints = computeVisioOrthogonalWaypoints(
+            const waypoints = computeDbDiagramWaypoints(
                 p1, item.sourceSide,
                 p2, item.targetSide,
                 item.sourcePos, item.targetPos,
@@ -105,68 +104,44 @@ window.DiagramRouter = (function () {
     }
 
     /**
-     * Cek apakah ada kartu lain di antara dua kartu dalam baris yang sama secara horizontal
+     * Tentukan orientasi sisi keluar/masuk setara dbdiagram.io:
+     * - Horisontal dominan (kartu bersebelahan/antar kolom): Keluar Right/Left, Masuk Left/Right (Z-Path rapi).
+     * - Vertikal dominan (satu kolom sejajar atas-bawah): Keluar Bottom/Top, Masuk Top/Bottom (Lurus).
      */
-    function hasIntermediateHorizontalCard(boxA, boxB, allBoxes) {
-        const minX = Math.min(boxA.x, boxB.x);
-        const maxX = Math.max(boxA.x + boxA.width, boxB.x + boxB.width);
-        const minY = Math.min(boxA.y, boxB.y) - 25;
-        const maxY = Math.max(boxA.y + boxA.height, boxB.y + boxB.height) + 25;
-
-        for (let i = 0; i < allBoxes.length; i++) {
-            const box = allBoxes[i];
-            if (box.id === boxA.id || box.id === boxB.id) continue;
-            // Jika kartu memotong rentang horizontal dan vertikal
-            if (box.x + box.width > minX + 15 && box.x < maxX - 15) {
-                if (box.y < maxY && (box.y + box.height) > minY) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Tentukan orientasi sisi keluar/masuk setara Visio & dbdiagram.io:
-     * - Relasi Mandiri (Self-Relation): Keluar Kanan (right), Masuk Atas (top).
-     * - Relasi Turun Hierarki (Target di bawah Sumber): Sumber keluar BAWAH (bottom), Target masuk ATAS (top).
-     * - Relasi Naik Hierarki (Target di atas Sumber): Sumber keluar ATAS (top), Target masuk BAWAH (bottom).
-     * - Relasi Satu Baris (Horizontal):
-     *   - Jika bersebelahan tanpa kartu di tengah: Keluar Kanan/Kiri, Masuk Kiri/Kanan.
-     *   - Jika terhalang kartu di tengah: Keluar ATAS, Masuk ATAS (panah dari atas, melambung di koridor atas).
-     */
-    function determineVisioSides(boxA, boxB, rel, allBoxes) {
-        // Relasi mandiri (User -> User)
+    function determineDbDiagramSides(boxA, boxB, rel) {
+        // Relasi mandiri (Self-relation)
         if (rel && rel.source === rel.target) {
             return { sourceSide: 'right', targetSide: 'top' };
         }
 
-        const centerA = { x: boxA.x + boxA.width / 2, y: boxA.y + boxA.height / 2 };
-        const centerB = { x: boxB.x + boxB.width / 2, y: boxB.y + boxB.height / 2 };
+        const aLeft = boxA.x;
+        const aRight = boxA.x + boxA.width;
+        const aTop = boxA.y;
+        const aBottom = boxA.y + boxA.height;
+        const aCenterX = (aLeft + aRight) / 2;
+        const aCenterY = (aTop + aBottom) / 2;
 
-        const dy = centerB.y - centerA.y;
-        const dx = centerB.x - centerA.x;
+        const bLeft = boxB.x;
+        const bRight = boxB.x + boxB.width;
+        const bTop = boxB.y;
+        const bBottom = boxB.y + boxB.height;
+        const bCenterX = (bLeft + bRight) / 2;
+        const bCenterY = (bTop + bBottom) / 2;
 
-        // Target berada di baris/tier bawah sumber:
-        // Standar Visio/dbdiagram: Keluar dari BAWAH, Masuk dari ATAS (Panah pasti dari atas!)
-        if (boxB.y >= boxA.y + 40 || dy > 45) {
+        const dx = bCenterX - aCenterX;
+        const dy = bCenterY - aCenterY;
+
+        // 1. Pemisahan vertikal jelas (Tier Atas ke Tier Bawah atau sebaliknya)
+        // Hubungkan Sisi Bawah (Bottom) ke Sisi Atas (Top) lewat koridor horizontal lapang
+        if (aBottom <= bTop + 35) {
             return { sourceSide: 'bottom', targetSide: 'top' };
         }
-
-        // Target berada di baris/tier atas sumber:
-        if (boxA.y >= boxB.y + 40 || dy < -45) {
+        if (bBottom <= aTop + 35) {
             return { sourceSide: 'top', targetSide: 'bottom' };
         }
 
-        // Satu baris horizontal sejajar (dy kecil):
-        // Jika ada kartu lain di antara A dan B:
-        // Rute lewat koridor ATAS dan panah masuk dari ATAS (agar tidak memotong kartu di tengah!)
-        if (allBoxes && hasIntermediateHorizontalCard(boxA, boxB, allBoxes)) {
-            return { sourceSide: 'top', targetSide: 'top' };
-        }
-
-        // Bersebelahan langsung tanpa halangan kartu tengah
-        if (dx >= 0) {
+        // 2. Berada di tier/baris yang sama atau overlap vertikal: hubungkan sisi samping (Right / Left)
+        if (dx > 0) {
             return { sourceSide: 'right', targetSide: 'left' };
         } else {
             return { sourceSide: 'left', targetSide: 'right' };
@@ -174,92 +149,65 @@ window.DiagramRouter = (function () {
     }
 
     /**
-     * Bagikan port merata pada sisi kartu agar garis-garis masuk/keluar terpisah rapi
+     * Alokasikan Anchor Port sesuai prinsip dbdiagram.io:
+     * 1. SISI SUMBER (Source): Seluruh garis dari sisi kartu yang sama keluar dari 1 titik anchor bersama (Center Anchor).
+     *    "bisa 1 node dari card di sisi yang sama bisa mengeluarkan banyak garis, tabrakan di node awal ndakpapa"
+     * 2. SISI TUJUAN (Target): Jika satu kartu tujuan menerima beberapa relasi di sisi yang sama,
+     *    buat titik masuk sedikit terpisah (branch spacing) agar cabangnya terbedakan dengan jelas.
+     *    "pas di cabangnya harus beda"
      */
     function assignPortSlots(resolvedRelations) {
         const portMap = new Map();
-        const sideGroups = new Map();
+        const targetSideGroups = new Map();
 
         resolvedRelations.forEach(item => {
-            const srcKey = item.rel.source + '_' + item.sourceSide;
+            // SISI SUMBER: 1 titik anchor bersama (Center Anchor)
+            const srcKey = item.rel.id + '_source';
+            portMap.set(srcKey, getCenterAnchor(item.sourcePos, item.sourceSide));
+
+            // Kumpulkan untuk SISI TUJUAN
             const tgtKey = item.rel.target + '_' + item.targetSide;
-
-            if (!sideGroups.has(srcKey)) sideGroups.set(srcKey, []);
-            if (!sideGroups.has(tgtKey)) sideGroups.set(tgtKey, []);
-
-            sideGroups.get(srcKey).push({
-                relId: item.rel.id,
-                isSource: true,
-                box: item.sourcePos,
-                side: item.sourceSide,
-                otherPos: item.targetPos
-            });
-
-            sideGroups.get(tgtKey).push({
-                relId: item.rel.id,
-                isSource: false,
-                box: item.targetPos,
-                side: item.targetSide,
-                otherPos: item.sourcePos
-            });
+            if (!targetSideGroups.has(tgtKey)) targetSideGroups.set(tgtKey, []);
+            targetSideGroups.get(tgtKey).push(item);
         });
 
-        sideGroups.forEach((entries, groupKey) => {
-            const [nodeId, side] = groupKey.split('_');
-            const box = entries[0].box;
+        // SISI TUJUAN: Pisahkan cabang masuk jika ada >1 relasi ke kartu tujuan yang sama
+        targetSideGroups.forEach((entries, groupKey) => {
+            const box = entries[0].targetPos;
+            const side = entries[0].targetSide;
             const count = entries.length;
 
-            // Urutkan entri berdasarkan posisi tujuan agar garis tidak saling silang
-            if (side === 'top' || side === 'bottom') {
-                entries.sort((a, b) => {
-                    const centerA = a.otherPos.x + a.otherPos.width / 2;
-                    const centerB = b.otherPos.x + b.otherPos.width / 2;
-                    if (Math.abs(centerA - centerB) > 5) {
-                        return centerA - centerB;
-                    }
-                    return a.relId.localeCompare(b.relId);
-                });
+            if (count === 1) {
+                const portKey = entries[0].rel.id + '_target';
+                portMap.set(portKey, getCenterAnchor(box, side));
             } else {
+                // Urutkan entri berdasarkan posisi sumber agar cabang tidak bersilangan
                 entries.sort((a, b) => {
-                    const centerA = a.otherPos.y + a.otherPos.height / 2;
-                    const centerB = b.otherPos.y + b.otherPos.height / 2;
-                    if (Math.abs(centerA - centerB) > 5) {
-                        return centerA - centerB;
+                    const centerA = (side === 'top' || side === 'bottom')
+                        ? (a.sourcePos.x + a.sourcePos.width / 2)
+                        : (a.sourcePos.y + a.sourcePos.height / 2);
+                    const centerB = (side === 'top' || side === 'bottom')
+                        ? (b.sourcePos.x + b.sourcePos.width / 2)
+                        : (b.sourcePos.y + b.sourcePos.height / 2);
+                    if (Math.abs(centerA - centerB) > 5) return centerA - centerB;
+                    return String(a.rel.id).localeCompare(String(b.rel.id));
+                });
+
+                const isHorizontalSide = (side === 'top' || side === 'bottom');
+                const centerPt = getCenterAnchor(box, side);
+                const BRANCH_SPACING = 24; // Jarak antar-cabang masuk ke target
+
+                entries.forEach((item, idx) => {
+                    const offset = Math.round((idx - (count - 1) / 2) * BRANCH_SPACING);
+                    let pt;
+                    if (isHorizontalSide) {
+                        pt = { x: centerPt.x + offset, y: centerPt.y };
+                    } else {
+                        pt = { x: centerPt.x, y: centerPt.y + offset };
                     }
-                    return a.relId.localeCompare(b.relId);
+                    portMap.set(item.rel.id + '_target', pt);
                 });
             }
-
-            const isHorizontalSide = (side === 'top' || side === 'bottom');
-            const totalDimension = isHorizontalSide ? box.width : box.height;
-
-            entries.forEach((entry, idx) => {
-                let pt;
-                if (count === 1) {
-                    pt = getCenterAnchor(box, side);
-                } else {
-                    // Margin aman dari pojok kartu agar tidak menyentuh sudut melengkung kartu
-                    const margin = Math.min(32, Math.max(20, totalDimension * 0.12));
-                    const usable = totalDimension - margin * 2;
-                    const step = usable / (count - 1);
-                    const offset = Math.round(margin + idx * step);
-
-                    if (isHorizontalSide) {
-                        pt = {
-                            x: Math.round(box.x + offset),
-                            y: side === 'top' ? box.y : (box.y + box.height)
-                        };
-                    } else {
-                        pt = {
-                            x: side === 'left' ? box.x : (box.x + box.width),
-                            y: Math.round(box.y + offset)
-                        };
-                    }
-                }
-
-                const portKey = entry.relId + (entry.isSource ? '_source' : '_target');
-                portMap.set(portKey, pt);
-            });
         });
 
         return portMap;
@@ -274,9 +222,6 @@ window.DiagramRouter = (function () {
         }
     }
 
-    /**
-     * Dapatkan titik stub berjarak tertentu tegak lurus menjauh dari sisi kartu
-     */
     function getStubPoint(pt, side, dist) {
         switch (side) {
             case 'top':    return { x: pt.x, y: pt.y - dist };
@@ -287,7 +232,7 @@ window.DiagramRouter = (function () {
     }
 
     /**
-     * Deteksi apakah segmen garis lurus (horizontal/vertikal) menabrak salah satu kotak obstacle
+     * Deteksi apakah segmen garis lurus menabrak kartu lain (rintangan)
      */
     function isSegmentBlocked(pA, pB, obstacles, ignoreIds) {
         const minX = Math.min(pA.x, pB.x);
@@ -302,11 +247,10 @@ window.DiagramRouter = (function () {
             const obs = obstacles[i];
             if (ignoreIds && ignoreIds.includes(obs.id)) continue;
 
-            // Clearance margin aman 16px agar garis tidak pernah menempel atau memotong kartu
-            const bLeft = obs.x - 16;
-            const bRight = obs.x + obs.width + 16;
-            const bTop = obs.y - 16;
-            const bBottom = obs.y + obs.height + 16;
+            const bLeft = obs.x - 8;
+            const bRight = obs.x + obs.width + 8;
+            const bTop = obs.y - 8;
+            const bBottom = obs.y + obs.height + 8;
 
             if (isHorizontal) {
                 const y = pA.y;
@@ -324,22 +268,16 @@ window.DiagramRouter = (function () {
     }
 
     /**
-     * Deteksi apakah seluruh jalur ortogonal bebas dari tabrakan dengan kartu lain
+     * Deteksi apakah seluruh jalur ortogonal bebas dari tabrakan dengan kartu lain.
+     * PENTING: sourceId dan targetId TIDAK BOLEH dianggap rintangan untuk relasi mereka sendiri.
      */
     function isPathBlocked(points, obstacles, sourceId, targetId) {
         if (!points || points.length < 2) return false;
 
+        const ignore = [sourceId, targetId];
+
         for (let i = 0; i < points.length - 1; i++) {
-            const pA = points[i];
-            const pB = points[i + 1];
-
-            const ignore = [];
-            // Segmen pertama terhubung ke sumber
-            if (i === 0) ignore.push(sourceId);
-            // Segmen terakhir terhubung ke target
-            if (i === points.length - 2) ignore.push(targetId);
-
-            if (isSegmentBlocked(pA, pB, obstacles, ignore)) {
+            if (isSegmentBlocked(points[i], points[i + 1], obstacles, ignore)) {
                 return true;
             }
         }
@@ -347,13 +285,13 @@ window.DiagramRouter = (function () {
     }
 
     /**
-     * Hitung jalur ortogonal Visio-grade dengan alokasi koridor multi-track bebas tabrakan
+     * Hitung jalur ortogonal DBDiagram-grade alami (Z-path, L-path) bebas tabrakan
      */
-    function computeVisioOrthogonalWaypoints(p1, side1, p2, side2, sourceBox, targetBox, obstacles, corridorTracks) {
-        // Kasus Khusus: Self-Relation (Siklus Mandiri Kelas yang Sama)
+    function computeDbDiagramWaypoints(p1, side1, p2, side2, sourceBox, targetBox, obstacles, corridorTracks) {
+        // 1. Kasus Khusus: Self-Relation (Siklus Mandiri Kelas yang Sama)
         if (sourceBox === targetBox || (sourceBox.id && sourceBox.id === targetBox.id)) {
-            const loopRight = sourceBox.x + sourceBox.width + 36;
-            const loopTop = sourceBox.y - 28;
+            const loopRight = sourceBox.x + sourceBox.width + 30;
+            const loopTop = sourceBox.y - 20;
             return cleanCollinearPoints([
                 p1,
                 { x: loopRight, y: p1.y },
@@ -366,230 +304,178 @@ window.DiagramRouter = (function () {
         const stub1 = getStubPoint(p1, side1, STUB_LENGTH);
         const stub2 = getStubPoint(p2, side2, STUB_LENGTH);
 
-        // KASUS A: Sisi Masuk & Keluar Keduanya di ATAS (side1: 'top', side2: 'top')
-        // Terjadi ketika dua kartu di baris yang sama dihubungkan melewati koridor atas (panah masuk dari atas!)
-        if (side1 === 'top' && side2 === 'top') {
-            const rowTopY = Math.min(sourceBox.y, targetBox.y);
-            const corridorKey = 'corridor_top_' + Math.round(rowTopY / 50) * 50;
-            const trackIdx = corridorTracks.get(corridorKey) || 0;
-            corridorTracks.set(corridorKey, trackIdx + 1);
-
-            const trackOffset = trackIdx * TRACK_SPACING;
-            const channelY = rowTopY - CARD_CLEARANCE - 16 - trackOffset;
-
-            const path = [
-                p1,
-                stub1,
-                { x: stub1.x, y: channelY },
-                { x: stub2.x, y: channelY },
-                stub2,
-                p2
-            ];
-            return cleanCollinearPoints(path);
-        }
-
-        // KASUS B: Relasi Vertikal Turun (Bottom ke Top - Pola Standar Hierarki/Relasi Turun)
-        // Sumber di baris atas, Target di baris bawah -> PANAH PASTI DARI ATAS
-        if (side1 === 'bottom' && side2 === 'top') {
-            const rowGapTop = sourceBox.y + sourceBox.height;
-            const rowGapBottom = targetBox.y;
-
-            if (rowGapBottom > rowGapTop + 15) {
-                // Jalur Lurus Murni jika hampir sejajar horizontal dan tidak ada kartu lain menghalangi
-                if (Math.abs(p1.x - p2.x) < 8) {
-                    const straightPath = [{ x: p1.x, y: p1.y }, { x: p1.x, y: p2.y }];
-                    if (!isPathBlocked(straightPath, obstacles, sourceBox.id, targetBox.id)) {
-                        return straightPath;
-                    }
-                }
-
-                // Alokasi Koridor Multi-Track
-                const rawMidY = Math.round((rowGapTop + rowGapBottom) / 2);
-                const corridorKey = 'corridor_y_' + Math.round(rawMidY / 50) * 50;
-                const trackIdx = corridorTracks.get(corridorKey) || 0;
-                corridorTracks.set(corridorKey, trackIdx + 1);
-
-                let trackOffset = 0;
-                if (trackIdx > 0) {
-                    const stepNum = Math.ceil(trackIdx / 2);
-                    trackOffset = (trackIdx % 2 === 1 ? -stepNum : stepNum) * TRACK_SPACING;
-                }
-
-                let channelY = rawMidY + trackOffset;
-                const minSafeY = rowGapTop + CARD_CLEARANCE;
-                const maxSafeY = rowGapBottom - CARD_CLEARANCE;
-                if (minSafeY < maxSafeY) {
-                    channelY = Math.max(minSafeY, Math.min(maxSafeY, channelY));
-                }
-
-                const candidatePath = [
-                    p1,
-                    { x: p1.x, y: channelY },
-                    { x: p2.x, y: channelY },
-                    p2
-                ];
-
-                // Jika jalur bebas tabrakan, gunakan langsung
-                if (!isPathBlocked(candidatePath, obstacles, sourceBox.id, targetBox.id)) {
-                    return cleanCollinearPoints(candidatePath);
-                }
-
-                // Coba elevasi tepat di bawah source
-                const tryY1 = rowGapTop + CARD_CLEARANCE + (trackIdx % 3) * TRACK_SPACING;
-                const path1 = [p1, { x: p1.x, y: tryY1 }, { x: p2.x, y: tryY1 }, p2];
-                if (!isPathBlocked(path1, obstacles, sourceBox.id, targetBox.id)) {
-                    return cleanCollinearPoints(path1);
-                }
-
-                // Coba elevasi tepat di atas target
-                const tryY2 = rowGapBottom - CARD_CLEARANCE - (trackIdx % 3) * TRACK_SPACING;
-                const path2 = [p1, { x: p1.x, y: tryY2 }, { x: p2.x, y: tryY2 }, p2];
-                if (!isPathBlocked(path2, obstacles, sourceBox.id, targetBox.id)) {
-                    return cleanCollinearPoints(path2);
-                }
-            }
-        }
-
-        // KASUS C: Relasi Vertikal Naik (Top ke Bottom - Target di atas Sumber)
-        if (side1 === 'top' && side2 === 'bottom') {
-            const rowGapBottom = sourceBox.y;
-            const rowGapTop = targetBox.y + targetBox.height;
-
-            if (rowGapBottom > rowGapTop + 15) {
-                if (Math.abs(p1.x - p2.x) < 8) {
-                    const straightPath = [{ x: p1.x, y: p1.y }, { x: p1.x, y: p2.y }];
-                    if (!isPathBlocked(straightPath, obstacles, sourceBox.id, targetBox.id)) {
-                        return straightPath;
-                    }
-                }
-
-                const rawMidY = Math.round((rowGapTop + rowGapBottom) / 2);
-                const corridorKey = 'corridor_y_' + Math.round(rawMidY / 50) * 50;
-                const trackIdx = corridorTracks.get(corridorKey) || 0;
-                corridorTracks.set(corridorKey, trackIdx + 1);
-
-                let trackOffset = 0;
-                if (trackIdx > 0) {
-                    const stepNum = Math.ceil(trackIdx / 2);
-                    trackOffset = (trackIdx % 2 === 1 ? -stepNum : stepNum) * TRACK_SPACING;
-                }
-
-                let channelY = rawMidY + trackOffset;
-                const minSafeY = rowGapTop + CARD_CLEARANCE;
-                const maxSafeY = rowGapBottom - CARD_CLEARANCE;
-                if (minSafeY < maxSafeY) {
-                    channelY = Math.max(minSafeY, Math.min(maxSafeY, channelY));
-                }
-
-                const candidatePath = [
-                    p1,
-                    { x: p1.x, y: channelY },
-                    { x: p2.x, y: channelY },
-                    p2
-                ];
-
-                if (!isPathBlocked(candidatePath, obstacles, sourceBox.id, targetBox.id)) {
-                    return cleanCollinearPoints(candidatePath);
-                }
-            }
-        }
-
-        // KASUS D: Relasi Horizontal Sejajar (Right ke Left)
+        // 2. KASUS UTAMA: Horisontal Z-Connector (Right ke Left) - Standar DBDiagram
         if (side1 === 'right' && side2 === 'left') {
-            const colGapLeft = sourceBox.x + sourceBox.width;
-            const colGapRight = targetBox.x;
-
-            if (colGapRight > colGapLeft + 15) {
-                const rawMidX = Math.round((colGapLeft + colGapRight) / 2);
-                const corridorKey = 'corridor_x_' + Math.round(rawMidX / 50) * 50;
+            if (p2.x >= p1.x + 10) {
+                const rawMidX = Math.round((p1.x + p2.x) / 2);
+                const corridorKey = 'corr_x_' + Math.round(rawMidX / 30) * 30;
                 const trackIdx = corridorTracks.get(corridorKey) || 0;
                 corridorTracks.set(corridorKey, trackIdx + 1);
 
-                let trackOffset = 0;
-                if (trackIdx > 0) {
-                    const stepNum = Math.ceil(trackIdx / 2);
-                    trackOffset = (trackIdx % 2 === 1 ? -stepNum : stepNum) * TRACK_SPACING;
-                }
+                const offset = (trackIdx % 2 === 1 ? -1 : 1) * Math.ceil(trackIdx / 2) * TRACK_SPACING;
+                const channelX = rawMidX + offset;
 
-                const channelX = Math.max(colGapLeft + 16, Math.min(colGapRight - 16, rawMidX + trackOffset));
-                const candidatePath = [
+                const path = [
                     p1,
                     { x: channelX, y: p1.y },
                     { x: channelX, y: p2.y },
                     p2
                 ];
 
-                if (!isPathBlocked(candidatePath, obstacles, sourceBox.id, targetBox.id)) {
-                    return cleanCollinearPoints(candidatePath);
+                if (!isPathBlocked(path, obstacles, sourceBox.id, targetBox.id)) {
+                    return cleanCollinearPoints(path);
                 }
             }
         }
 
-        // KASUS E: Relasi Horizontal Sejajar Terbalik (Left ke Right)
+        // 3. Horisontal Z-Connector Terbalik (Left ke Right)
         if (side1 === 'left' && side2 === 'right') {
-            const colGapRight = sourceBox.x;
-            const colGapLeft = targetBox.x + targetBox.width;
+            if (p1.x >= p2.x + 10) {
+                const rawMidX = Math.round((p1.x + p2.x) / 2);
+                const corridorKey = 'corr_x_' + Math.round(rawMidX / 30) * 30;
+                const trackIdx = corridorTracks.get(corridorKey) || 0;
+                corridorTracks.set(corridorKey, trackIdx + 1);
 
-            if (colGapRight > colGapLeft + 15) {
-                const rawMidX = Math.round((colGapLeft + colGapRight) / 2);
-                const candidatePath = [
+                const offset = (trackIdx % 2 === 1 ? -1 : 1) * Math.ceil(trackIdx / 2) * TRACK_SPACING;
+                const channelX = rawMidX + offset;
+
+                const path = [
                     p1,
-                    { x: rawMidX, y: p1.y },
-                    { x: rawMidX, y: p2.y },
+                    { x: channelX, y: p1.y },
+                    { x: channelX, y: p2.y },
                     p2
                 ];
 
-                if (!isPathBlocked(candidatePath, obstacles, sourceBox.id, targetBox.id)) {
-                    return cleanCollinearPoints(candidatePath);
+                if (!isPathBlocked(path, obstacles, sourceBox.id, targetBox.id)) {
+                    return cleanCollinearPoints(path);
                 }
             }
         }
 
-        // KASUS F: Fallback Ortogonal dengan Stub Wajib
-        // Jika targetSide adalah 'top', selalu jaga agar stub2 berada di ATAS p2 (panah dari atas!)
-        if (side2 === 'top') {
-            const midY = (stub1.y + stub2.y) / 2;
-            const tryPath = [
-                p1,
-                stub1,
-                { x: stub1.x, y: midY },
-                { x: stub2.x, y: midY },
-                stub2,
-                p2
-            ];
-            if (!isPathBlocked(tryPath, obstacles, sourceBox.id, targetBox.id)) {
-                return cleanCollinearPoints(tryPath);
+        // 4. KASUS UTAMA: Vertikal Z-Connector (Bottom ke Top) - Satu Kolom Sejajar
+        if (side1 === 'bottom' && side2 === 'top') {
+            // Garis lurus murni jika hampir satu garis vertikal
+            if (Math.abs(p1.x - p2.x) < 8) {
+                const straightPath = [{ x: p1.x, y: p1.y }, { x: p1.x, y: p2.y }];
+                if (!isPathBlocked(straightPath, obstacles, sourceBox.id, targetBox.id)) {
+                    return straightPath;
+                }
+            }
+
+            if (p2.y >= p1.y + 10) {
+                const rawMidY = Math.round((p1.y + p2.y) / 2);
+                const corridorKey = 'corr_y_' + Math.round(rawMidY / 30) * 30;
+                const trackIdx = corridorTracks.get(corridorKey) || 0;
+                corridorTracks.set(corridorKey, trackIdx + 1);
+
+                const offset = (trackIdx % 2 === 1 ? -1 : 1) * Math.ceil(trackIdx / 2) * TRACK_SPACING;
+                const channelY = rawMidY + offset;
+
+                const path = [
+                    p1,
+                    { x: p1.x, y: channelY },
+                    { x: p2.x, y: channelY },
+                    p2
+                ];
+
+                if (!isPathBlocked(path, obstacles, sourceBox.id, targetBox.id)) {
+                    return cleanCollinearPoints(path);
+                }
             }
         }
 
-        // RUTE DETOUR ZERO-COLLISION: Jika rute tengah terhalang, melambung lewat ruang kosong atas atau bawah
-        const allTops = obstacles.map(b => b.y);
-        const allBottoms = obstacles.map(b => b.y + b.height);
-        const minTop = Math.min(...allTops, sourceBox.y, targetBox.y);
-        const maxBottom = Math.max(...allBottoms, sourceBox.y + sourceBox.height, targetBox.y + targetBox.height);
+        // 5. Vertikal Z-Connector Terbalik (Top ke Bottom)
+        if (side1 === 'top' && side2 === 'bottom') {
+            if (Math.abs(p1.x - p2.x) < 8) {
+                const straightPath = [{ x: p1.x, y: p1.y }, { x: p1.x, y: p2.y }];
+                if (!isPathBlocked(straightPath, obstacles, sourceBox.id, targetBox.id)) {
+                    return straightPath;
+                }
+            }
 
-        // Pilih rute melambung atas jika side2 === 'top'
-        if (side2 === 'top' || side1 === 'top') {
-            const detourY = minTop - CARD_CLEARANCE - 20;
-            return cleanCollinearPoints([
-                p1,
-                stub1,
-                { x: stub1.x, y: detourY },
-                { x: stub2.x, y: detourY },
-                stub2,
-                p2
-            ]);
+            if (p1.y >= p2.y + 10) {
+                const rawMidY = Math.round((p1.y + p2.y) / 2);
+                const corridorKey = 'corr_y_' + Math.round(rawMidY / 30) * 30;
+                const trackIdx = corridorTracks.get(corridorKey) || 0;
+                corridorTracks.set(corridorKey, trackIdx + 1);
+
+                const offset = (trackIdx % 2 === 1 ? -1 : 1) * Math.ceil(trackIdx / 2) * TRACK_SPACING;
+                const channelY = rawMidY + offset;
+
+                const path = [
+                    p1,
+                    { x: p1.x, y: channelY },
+                    { x: p2.x, y: channelY },
+                    p2
+                ];
+
+                if (!isPathBlocked(path, obstacles, sourceBox.id, targetBox.id)) {
+                    return cleanCollinearPoints(path);
+                }
+            }
         }
 
-        const detourBottomY = maxBottom + CARD_CLEARANCE + 20;
-        return cleanCollinearPoints([
+        // 6. Jalur L-Shape Elegan: Right-ke-Top atau Left-ke-Top
+        if ((side1 === 'right' || side1 === 'left') && side2 === 'top') {
+            const lPath = [
+                p1,
+                { x: p2.x, y: p1.y },
+                p2
+            ];
+            if (!isPathBlocked(lPath, obstacles, sourceBox.id, targetBox.id)) {
+                return cleanCollinearPoints(lPath);
+            }
+        }
+
+        // 7. Jalur L-Shape Elegan: Bottom-ke-Left atau Bottom-ke-Right
+        if (side1 === 'bottom' && (side2 === 'left' || side2 === 'right')) {
+            const lPath = [
+                p1,
+                { x: p1.x, y: p2.y },
+                p2
+            ];
+            if (!isPathBlocked(lPath, obstacles, sourceBox.id, targetBox.id)) {
+                return cleanCollinearPoints(lPath);
+            }
+        }
+
+        // 8. Fallback Ortogonal dengan Stub Bebas Tabrakan
+        // Hubungkan stub1 ke stub2 secara ortogonal
+        let fallbackPath = null;
+        if (side1 === 'right' || side1 === 'left') {
+            fallbackPath = [
+                p1,
+                stub1,
+                { x: stub1.x, y: stub2.y },
+                stub2,
+                p2
+            ];
+        } else {
+            fallbackPath = [
+                p1,
+                stub1,
+                { x: stub2.x, y: stub1.y },
+                stub2,
+                p2
+            ];
+        }
+
+        if (!isPathBlocked(fallbackPath, obstacles, sourceBox.id, targetBox.id)) {
+            return cleanCollinearPoints(fallbackPath);
+        }
+
+        // Jalur alternatif Z-step antara stub
+        const midStubX = Math.round((stub1.x + stub2.x) / 2);
+        const altZPath = [
             p1,
             stub1,
-            { x: stub1.x, y: detourBottomY },
-            { x: stub2.x, y: detourBottomY },
+            { x: midStubX, y: stub1.y },
+            { x: midStubX, y: stub2.y },
             stub2,
             p2
-        ]);
+        ];
+
+        return cleanCollinearPoints(altZPath);
     }
 
     /**
@@ -732,25 +618,35 @@ window.DiagramRouter = (function () {
             return { x: Math.round((points[0].x + points[1].x) / 2), y: Math.round((points[0].y + points[1].y) / 2) };
         }
 
-        let longestLen = -1;
-        let bestMid = { x: 0, y: 0 };
-
+        let totalLength = 0;
+        const lengths = [];
         for (let i = 0; i < points.length - 1; i++) {
-            const p1 = points[i];
-            const p2 = points[i + 1];
-            const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-
-            if (len > longestLen) {
-                longestLen = len;
-                bestMid = { x: Math.round((p1.x + p2.x) / 2), y: Math.round((p1.y + p2.y) / 2) };
-            }
+            const len = Math.hypot(points[i + 1].x - points[i].x, points[i + 1].y - points[i].y);
+            lengths.push(len);
+            totalLength += len;
         }
 
-        return bestMid;
+        const halfLength = totalLength / 2;
+        let accumulated = 0;
+
+        for (let i = 0; i < lengths.length; i++) {
+            if (accumulated + lengths[i] >= halfLength) {
+                const remain = halfLength - accumulated;
+                const ratio = lengths[i] > 0 ? (remain / lengths[i]) : 0;
+                return {
+                    x: Math.round(points[i].x + (points[i + 1].x - points[i].x) * ratio),
+                    y: Math.round(points[i].y + (points[i + 1].y - points[i].y) * ratio)
+                };
+            }
+            accumulated += lengths[i];
+        }
+
+        return points[Math.floor(points.length / 2)];
     }
 
     return {
         calculateRoutes: calculateRoutes,
+        determineSides: determineDbDiagramSides,
         buildRoundedPath: buildRoundedPath
     };
 })();
