@@ -39,17 +39,17 @@ class AuthController
             redirect('login');
         }
 
-        $email = filter_var($_POST['email'] ?? '', FILTER_SANITIZE_EMAIL);
+        $loginInput = trim($_POST['email'] ?? $_POST['username'] ?? '');
         $password = (string) ($_POST['password'] ?? '');
 
-        if (empty($email) || empty($password)) {
-            $_SESSION['flash_error'] = 'Email dan password wajib diisi.';
+        if (empty($loginInput) || empty($password)) {
+            $_SESSION['flash_error'] = 'Username/email dan password wajib diisi.';
             redirect('login');
         }
 
         try {
             $user_model = new UserModel();
-            $user = $user_model->findByEmail($email);
+            $user = $user_model->findByEmailOrUsername($loginInput);
 
             if ($user && verify_password($password, $user['password'])) {
                 // Regenerasi session ID untuk mencegah session fixation

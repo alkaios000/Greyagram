@@ -10,24 +10,25 @@
    - Responsive untuk tablet dan desktop
    ========================================================================== */
 
-/* --- Reset & Variabel Global --- */
+/* --- Reset & Variabel Global (Dark Theme by Default) --- */
 :root {
-    --bg-main: #ffffff;
-    --bg-surface: #ffffff;
-    --border-color: #e5e7eb;
-    --border-focus: #4a80f0;
+    --bg-main: #0b0c10;
+    --bg-surface: #111318;
+    --bg-card: #161922;
+    --border-color: #222634;
+    --border-focus: #3b82f6;
     
-    --text-primary: #111827;
-    --text-secondary: #4b5563;
-    --text-muted: #6b7280;
+    --text-primary: #f8fafc;
+    --text-secondary: #cbd5e1;
+    --text-muted: #64748b;
 
-    --btn-primary: #4a80f0;
-    --btn-primary-hover: #3b71db;
+    --btn-primary: #2563eb;
+    --btn-primary-hover: #1d4ed8;
     --btn-primary-text: #ffffff;
 
-    --danger: #dc2626;
-    --danger-bg: #fef2f2;
-    --danger-border: #fecaca;
+    --danger: #ef4444;
+    --danger-bg: rgba(239, 68, 68, 0.12);
+    --danger-border: rgba(239, 68, 68, 0.3);
 
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --sidebar-width: 195px;
@@ -50,17 +51,17 @@
 }
 
 ::-webkit-scrollbar-thumb {
-    background-color: #d1d5db;
+    background-color: #2a3040;
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background-color: #9ca3af;
+    background-color: #3b4255;
 }
 
 * {
     scrollbar-width: thin;
-    scrollbar-color: #d1d5db transparent;
+    scrollbar-color: #2a3040 transparent;
 }
 
 /* --- Tipografi & Elemen Dasar --- */
@@ -110,7 +111,7 @@ a:hover {
 /* --- Sidebar (Compact & Sleek) --- */
 .app-sidebar {
     width: var(--sidebar-width);
-    background-color: #ffffff;
+    background-color: var(--bg-surface);
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
@@ -147,7 +148,7 @@ a:hover {
 .user-avatar {
     width: 28px;
     height: 28px;
-    background-color: #f3f4f6;
+    background-color: #1a1e2b;
     border: 1px solid var(--border-color);
     border-radius: 50%;
     display: flex;
@@ -203,14 +204,14 @@ a:hover {
 }
 
 .nav-link:hover {
-    background-color: #f9fafb;
-    color: var(--text-primary);
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
     text-decoration: none;
 }
 
 .nav-link.active {
-    background-color: #eff6ff;
-    color: var(--btn-primary);
+    background-color: rgba(37, 99, 235, 0.18);
+    color: #60a5fa;
 }
 
 .nav-link-logout {
@@ -262,13 +263,14 @@ a:hover {
 
 /* --- Card Component (Rapi, Margin/Padding Proporsional, Tanpa Animasi) --- */
 .card {
-    background-color: #ffffff;
+    background-color: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     margin-bottom: 1.25rem;
 }
 
 .card-header {
+    background-color: #141722;
     padding: 0.875rem 1.25rem;
     border-bottom: 1px solid var(--border-color);
 }
@@ -286,7 +288,7 @@ a:hover {
 }
 
 .stat-card {
-    background-color: #ffffff;
+    background-color: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1rem 1.25rem;
@@ -321,7 +323,7 @@ a:hover {
     gap: 0.5rem;
     font-size: 0.875rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid var(--border-color);
 }
 
 .activity-item:last-child {
@@ -412,7 +414,7 @@ a:hover {
     align-items: center;
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    background-color: #ffffff;
+    background-color: #0e1016;
 }
 
 .input-icon {
@@ -428,6 +430,11 @@ a:hover {
     outline: none;
     font-family: inherit;
     background: transparent;
+    color: var(--text-primary);
+}
+
+.form-control::placeholder {
+    color: var(--text-muted);
 }
 
 .input-group:focus-within {
@@ -459,14 +466,14 @@ a:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: #ffffff;
+    background-color: var(--bg-main);
     padding: 1.5rem;
 }
 
 .auth-card {
     width: 100%;
     max-width: 400px;
-    background-color: #ffffff;
+    background-color: var(--bg-card);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 2rem;
@@ -506,7 +513,7 @@ a:hover {
 }
 
 .data-table th {
-    background-color: #f9fafb;
+    background-color: var(--bg-surface);
     color: var(--text-secondary);
     font-weight: 600;
 }
@@ -516,14 +523,15 @@ a:hover {
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
     font-weight: 500;
-    background-color: #eff6ff;
-    color: var(--btn-primary);
+    background-color: rgba(37, 99, 235, 0.2);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.3);
     border-radius: 4px;
 }
 
 /* --- Footer --- */
 .app-footer {
-    background-color: #ffffff;
+    background-color: var(--bg-surface);
     border-top: 1px solid var(--border-color);
     padding: 1rem 2rem;
     text-align: center;
@@ -592,7 +600,7 @@ a:hover {
 /* Toolbar Atas (Compact & Rapi - Anti Tumpuk) */
 .diagram-toolbar {
     height: 46px;
-    background-color: #ffffff;
+    background-color: var(--bg-surface);
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
@@ -612,7 +620,7 @@ a:hover {
 }
 
 .diagram-toolbar::-webkit-scrollbar-thumb {
-    background-color: #e2e8f0;
+    background-color: #2a3040;
     border-radius: 3px;
 }
 
@@ -640,6 +648,15 @@ a:hover {
     gap: 0.35rem;
     white-space: nowrap;
     flex-shrink: 0;
+    background-color: #161922;
+    border: 1px solid #282e3e;
+    color: var(--text-secondary);
+}
+
+.toolbar-btn:hover {
+    background-color: #1f2330;
+    color: #ffffff;
+    border-color: #3b82f6;
 }
 
 .template-select {
@@ -647,7 +664,7 @@ a:hover {
     font-size: 0.76rem;
     border-radius: 5px;
     border: 1px solid var(--border-color);
-    background-color: #ffffff;
+    background-color: #161922;
     color: var(--text-primary);
     cursor: pointer;
     min-width: 130px;
@@ -661,8 +678,13 @@ a:hover {
     outline: none;
 }
 
+.template-select option {
+    background-color: #161922;
+    color: var(--text-primary);
+}
+
 .diagram-meta-badge {
-    background-color: #f9fafb;
+    background-color: #161922;
     border: 1px solid var(--border-color);
     border-radius: 14px;
     padding: 0.18rem 0.55rem;
@@ -683,7 +705,7 @@ a:hover {
     border: 1px solid var(--border-color);
     border-radius: 5px;
     overflow: hidden;
-    background-color: #ffffff;
+    background-color: #161922;
 }
 
 .zoom-controls .btn-icon {
@@ -698,7 +720,7 @@ a:hover {
 }
 
 .zoom-controls .btn-icon:hover {
-    background-color: #f3f4f6;
+    background-color: rgba(255, 255, 255, 0.08);
     color: var(--text-primary);
 }
 
@@ -710,6 +732,7 @@ a:hover {
     text-align: center;
     border-left: 1px solid var(--border-color) !important;
     border-right: 1px solid var(--border-color) !important;
+    color: var(--text-primary);
 }
 
 /* Container Workspace */
@@ -720,7 +743,7 @@ a:hover {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background-color: #ffffff;
+    background-color: var(--bg-main);
 }
 
 /* Drawer Editor Kode Mermaid */
@@ -728,9 +751,9 @@ a:hover {
     position: relative;
     width: 380px;
     min-width: 380px;
-    background-color: #ffffff;
+    background-color: var(--bg-surface);
     border-right: 1px solid var(--border-color);
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.03);
+    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.3);
     z-index: 20;
     display: flex;
     flex-direction: column;
@@ -751,7 +774,7 @@ a:hover {
         left: 0;
         bottom: 0;
         z-index: 30;
-        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+        box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
         transform: translateX(-100%);
         margin-left: 0 !important;
         transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -771,7 +794,7 @@ a:hover {
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid var(--border-color);
-    background-color: #ffffff;
+    background-color: #141722;
 }
 
 .drawer-title {
@@ -794,7 +817,7 @@ a:hover {
 }
 
 .drawer-close-btn:hover {
-    background-color: #f3f4f6;
+    background-color: rgba(255, 255, 255, 0.08);
     color: var(--text-primary);
 }
 
@@ -813,17 +836,17 @@ a:hover {
     font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
     font-size: 0.8125rem;
     line-height: 1.5;
-    background-color: #fbfbfb;
+    background-color: #0a0c10;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     padding: 0.75rem;
     resize: none;
-    color: #1f2937;
+    color: #e2e8f0;
     white-space: pre;
 }
 
 .mermaid-textarea:focus {
-    background-color: #ffffff;
+    background-color: #0d0f14;
     border-color: var(--border-focus);
     outline: none;
 }
@@ -841,7 +864,7 @@ a:hover {
 }
 
 .syntax-cheatsheet {
-    background-color: #f9fafb;
+    background-color: #141722;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     padding: 0.75rem;
@@ -863,17 +886,17 @@ a:hover {
 }
 
 .cheatsheet-list code {
-    background-color: #edf2f7;
+    background-color: #1c202d;
     padding: 0.1rem 0.3rem;
     border-radius: 3px;
     font-weight: 600;
-    color: #2b6cb0;
+    color: #60a5fa;
 }
 
 .editor-drawer-footer {
     padding: 0.75rem 1rem;
     border-top: 1px solid var(--border-color);
-    background-color: #ffffff;
+    background-color: #141722;
 }
 
 /* Area Kanvas */
@@ -884,13 +907,13 @@ a:hover {
     height: 100%;
     overflow: hidden;
     user-select: none;
-    background-color: #ffffff;
+    background-color: #0b0c10;
 }
 
 .canvas-background {
     position: absolute;
     inset: 0;
-    background-image: radial-gradient(#d1d5db 1.2px, transparent 1.2px);
+    background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1.2px, transparent 1.2px);
     background-size: 24px 24px;
     background-position: 0 0;
     pointer-events: auto;
@@ -935,10 +958,10 @@ a:hover {
 /* Kartu Node Kelas Modern */
 .diagram-class-card {
     position: absolute;
-    background-color: #ffffff;
-    border: 1px solid #d1d5db;
+    background-color: var(--bg-card);
+    border: 1px solid #2a3040;
     border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     pointer-events: auto;
     cursor: default;
     overflow: hidden;
@@ -949,19 +972,19 @@ a:hover {
 }
 
 .diagram-class-card:hover {
-    border-color: #93c5fd;
-    box-shadow: 0 4px 12px rgba(74, 128, 240, 0.1);
+    border-color: #3b82f6;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.6), 0 0 12px rgba(59, 130, 246, 0.2);
 }
 
 .diagram-class-card.is-dragging {
     border-color: var(--btn-primary);
-    box-shadow: 0 8px 24px rgba(74, 128, 240, 0.2);
+    box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
     z-index: 100;
 }
 
 .class-card-header {
-    background-color: #f9fafb;
-    border-bottom: 1px solid #e5e7eb;
+    background-color: #1c202d;
+    border-bottom: 1px solid #262c3b;
     padding: 0.6rem 0.85rem;
     cursor: grab;
     display: flex;
@@ -977,7 +1000,7 @@ a:hover {
 .class-stereotype {
     font-size: 0.65rem;
     font-weight: 600;
-    color: var(--text-muted);
+    color: #60a5fa;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 0.15rem;
@@ -998,7 +1021,7 @@ a:hover {
 .class-title {
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--text-primary);
+    color: #ffffff;
 }
 
 .class-card-body {
@@ -1036,10 +1059,10 @@ a:hover {
     text-align: center;
 }
 
-.vis-public    { color: #10b981; }
-.vis-private   { color: #ef4444; }
-.vis-protected { color: #f59e0b; }
-.vis-package   { color: #64748b; }
+.vis-public    { color: #34d399; }
+.vis-private   { color: #f87171; }
+.vis-protected { color: #fbbf24; }
+.vis-package   { color: #94a3b8; }
 
 .member-text {
     color: var(--text-secondary);
@@ -1050,13 +1073,13 @@ a:hover {
 
 .class-card-divider {
     height: 1px;
-    background-color: #f3f4f6;
+    background-color: #262c3b;
     margin: 0.2rem 0;
 }
 
 /* Gaya Jalur Konektor SVG */
 .relation-path {
-    stroke: #374151;
+    stroke: #4b5563;
     stroke-width: 1.5;
     transition: stroke 0.15s ease;
 }
@@ -1067,30 +1090,30 @@ a:hover {
 }
 
 .relation-label-bg {
-    fill: #ffffff;
-    stroke: #cbd5e1;
+    fill: #1c202d;
+    stroke: #3b4255;
     stroke-width: 1;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.05));
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
 }
 
 .relation-label-text {
     font-size: 11px;
     font-weight: 500;
-    fill: #334155;
+    fill: #f1f5f9;
     font-family: 'Inter', sans-serif;
 }
 
 .cardinality-badge-bg {
-    fill: #ffffff;
-    stroke: #cbd5e1;
+    fill: #1c202d;
+    stroke: #3b4255;
     stroke-width: 1;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.06));
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
 }
 
 .cardinality-badge-text {
     font-size: 10px;
     font-weight: 700;
-    fill: #1e293b;
+    fill: #cbd5e1;
     font-family: 'Inter', sans-serif;
     user-select: none;
     pointer-events: none;
@@ -1099,10 +1122,10 @@ a:hover {
 .cardinality-text {
     font-size: 10px;
     font-weight: 700;
-    fill: #1e293b;
+    fill: #cbd5e1;
     font-family: 'Inter', sans-serif;
     paint-order: stroke fill;
-    stroke: #ffffff;
+    stroke: #0b0c10;
     stroke-width: 4px;
     stroke-linejoin: round;
     user-select: none;
@@ -1115,9 +1138,9 @@ a:hover {
     bottom: 1rem;
     left: 50%;
     transform: translateX(-50%);
-    background-color: rgba(255, 255, 255, 0.95);
+    background-color: rgba(22, 25, 34, 0.95);
     border: 1px solid var(--border-color);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     border-radius: 20px;
     padding: 0.35rem 0.85rem;
     font-size: 0.75rem;
@@ -1167,11 +1190,11 @@ a:hover {
     gap: 0.4rem;
     font-size: 0.85rem;
     font-weight: 600;
-    color: #111827;
-    background-color: #f3f4f6;
+    color: var(--text-primary);
+    background-color: #161922;
     padding: 0.35rem 0.75rem;
     border-radius: 6px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--border-color);
     max-width: 240px;
     white-space: nowrap;
     overflow: hidden;
@@ -1190,8 +1213,8 @@ a:hover {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(17, 24, 39, 0.45);
-    backdrop-filter: blur(2px);
+    background-color: rgba(0, 0, 0, 0.78);
+    backdrop-filter: blur(5px);
     z-index: 1050;
     display: flex;
     align-items: center;
@@ -1208,10 +1231,10 @@ a:hover {
 }
 
 .diagram-modal-box {
-    background-color: #ffffff;
+    background-color: #141722;
     border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-    border: 1px solid #e5e7eb;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+    border: 1px solid #282e3e;
     width: 100%;
     max-width: 520px;
     max-height: 85vh;
@@ -1227,7 +1250,8 @@ a:hover {
 
 .diagram-modal-header {
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid #242938;
+    background-color: #171b26;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1236,7 +1260,7 @@ a:hover {
 .diagram-modal-title {
     font-size: 1.05rem;
     font-weight: 600;
-    color: #111827;
+    color: #f8fafc;
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -1249,7 +1273,7 @@ a:hover {
 .diagram-modal-close {
     background: transparent;
     border: none;
-    color: #6b7280;
+    color: #94a3b8;
     font-size: 1.1rem;
     cursor: pointer;
     padding: 0.25rem;
@@ -1259,11 +1283,13 @@ a:hover {
 }
 
 .diagram-modal-close:hover {
-    color: #111827;
+    color: #ffffff;
 }
 
 .diagram-modal-body {
     padding: 1.25rem;
+    background-color: #141722;
+    color: #cbd5e1;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
@@ -1272,18 +1298,19 @@ a:hover {
 
 .diagram-modal-footer {
     padding: 0.85rem 1.25rem;
-    border-top: 1px solid #f3f4f6;
+    border-top: 1px solid #242938;
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 0.75rem;
-    background-color: #f9fafb;
+    background-color: #171b26;
     border-bottom-left-radius: 10px;
     border-bottom-right-radius: 10px;
 }
 
 .diagram-item-card {
-    border: 1px solid #e5e7eb;
+    border: 1px solid #252b3c;
+    background-color: #161924;
     border-radius: 8px;
     padding: 0.85rem 1rem;
     display: flex;
@@ -1294,8 +1321,8 @@ a:hover {
 }
 
 .diagram-item-card:hover {
-    border-color: #93c5fd;
-    background-color: #f8fafc;
+    border-color: #3b82f6;
+    background-color: #1c2234;
 }
 
 .diagram-item-info {
@@ -1308,7 +1335,7 @@ a:hover {
 .diagram-item-title {
     font-size: 0.9rem;
     font-weight: 600;
-    color: #111827;
+    color: #f8fafc;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -1316,7 +1343,7 @@ a:hover {
 
 .diagram-item-meta {
     font-size: 0.75rem;
-    color: #6b7280;
+    color: #64748b;
 }
 
 .diagram-item-actions {

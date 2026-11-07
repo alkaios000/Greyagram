@@ -310,12 +310,6 @@ require_once __DIR__ . '/../layouts/header.php';
                     <i class="fa-solid fa-expand"></i>
                 </button>
             </div>
-
-            <!-- Canvas Floating Instructions / Help -->
-            <div class="canvas-floating-hint">
-                <i class="fa-solid fa-arrows-up-down-left-right"></i>
-                <span>Tarik latar untuk Pan &bull; Drag header kartu untuk geser &bull; Scroll untuk Zoom</span>
-            </div>
         </section>
 
         <!-- 3. RIGHT: Editor Kode Mermaid (Expandable with Minimum Width, Angle Toggle, Default Show) -->
@@ -1232,6 +1226,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     const res = await response.json();
                     if (res.success) {
+                        currentLayoutData = layoutData;
                         updateSaveStatus('saved', 'Posisi tersimpan');
                     } else {
                         updateSaveStatus('unsaved', 'Perubahan belum disimpan');

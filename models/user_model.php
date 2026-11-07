@@ -17,6 +17,17 @@ class UserModel
     }
 
     /**
+     * Cari pengguna berdasarkan email atau username/nama
+     */
+    public function findByEmailOrUsername(string $identifier): ?array
+    {
+        $stmt = $this->db->prepare("SELECT * FROM users WHERE email = :id1 OR name = :id2 LIMIT 1");
+        $stmt->execute(['id1' => $identifier, 'id2' => $identifier]);
+        $result = $stmt->fetch();
+        return $result ?: null;
+    }
+
+    /**
      * Cari pengguna berdasarkan email
      */
     public function findByEmail(string $email): ?array

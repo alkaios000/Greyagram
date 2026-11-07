@@ -14,11 +14,11 @@ require_once __DIR__ . '/../layouts/sidebar.php';
                 <i class="fa-solid fa-layer-group"></i>
                 <span>Proyek Saya</span>
             </a>
-            <a href="<?= base_url('diagram') ?>" class="btn btn-outline" style="border: 1px solid var(--border-color); background: #ffffff; color: var(--text-primary);">
+            <a href="<?= base_url('diagram') ?>" class="btn btn-outline">
                 <i class="fa-solid fa-plus"></i>
                 <span>Buat Diagram Baru</span>
             </a>
-            <a href="<?= base_url('users') ?>" class="btn btn-outline" style="border: 1px solid var(--border-color); background: #ffffff; color: var(--text-primary);">
+            <a href="<?= base_url('users') ?>" class="btn btn-outline">
                 <i class="fa-solid fa-users"></i>
                 <span>Kelola Pengguna</span>
             </a>

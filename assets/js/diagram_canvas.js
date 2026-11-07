@@ -66,6 +66,8 @@ window.DiagramCanvas = (function () {
                         const cur = state.nodePositions.get(id);
                         if (typeof positionsObj[id].x === 'number') cur.x = positionsObj[id].x;
                         if (typeof positionsObj[id].y === 'number') cur.y = positionsObj[id].y;
+                        if (typeof positionsObj[id].width === 'number') cur.width = positionsObj[id].width;
+                        if (typeof positionsObj[id].height === 'number') cur.height = positionsObj[id].height;
                         hasSavedPositions = true;
                     }
                 });
@@ -83,7 +85,7 @@ window.DiagramCanvas = (function () {
             renderNodeElements();
 
             // Ukur dimensi fisik aktual setiap kartu secara sinkron dari DOM
-            measureActualNodeDimensions(!hasSavedPositions);
+            measureActualNodeDimensions();
 
             // Render SVG connectors dengan koordinat dimensi riil
             updateConnectors();
@@ -113,9 +115,9 @@ window.DiagramCanvas = (function () {
 
         /**
          * Ukur tinggi dan lebar fisik sebenarnya dari elemen DOM kartu
-         * dan pastikan celah/koridor antar baris selalu lapang (anti-tabrakan).
+         * Memastikan router konektor garis selalu mengetahui batas fisik akurat kartu tanpa mengubah posisi (x, y)
          */
-        function measureActualNodeDimensions(shouldEnforceGaps = true) {
+        function measureActualNodeDimensions() {
             state.classes.forEach(cls => {
                 const card = document.getElementById('node_' + cls.id);
                 if (card) {
@@ -128,80 +130,6 @@ window.DiagramCanvas = (function () {
                     }
                 }
             });
-
-            if (shouldEnforceGaps) {
-                enforceMinimumRowGaps();
-            }
-        }
-
-        /**
-         * Pastikan koridor vertikal antar baris kartu selalu memiliki ruang bebas minimal 140px
-         */
-        function enforceMinimumRowGaps() {
-            if (state.classes.length === 0) return;
-
-            const cardList = [];
-            state.classes.forEach(cls => {
-                const pos = state.nodePositions.get(cls.id);
-                if (pos) {
-                    cardList.push({ id: cls.id, pos: pos });
-                }
-            });
-
-            if (cardList.length === 0) return;
-
-            // Kelompokkan kartu ke dalam baris/tier (toleransi vertikal 50px)
-            cardList.sort((a, b) => a.pos.y - b.pos.y);
-
-            const rows = [];
-            cardList.forEach(item => {
-                let placedInRow = false;
-                for (let r = 0; r < rows.length; r++) {
-                    const rowAvgY = rows[r].reduce((sum, c) => sum + c.pos.y, 0) / rows[r].length;
-                    if (Math.abs(item.pos.y - rowAvgY) <= 50) {
-                        rows[r].push(item);
-                        placedInRow = true;
-                        break;
-                    }
-                }
-                if (!placedInRow) {
-                    rows.push([item]);
-                }
-            });
-
-            // Urutkan baris dari atas ke bawah
-            rows.sort((r1, r2) => {
-                const y1 = r1.reduce((sum, c) => sum + c.pos.y, 0) / r1.length;
-                const y2 = r2.reduce((sum, c) => sum + c.pos.y, 0) / r2.length;
-                return y1 - y2;
-            });
-
-            // Periksa celah antar baris berurutan: pastikan minimal 140px
-            const MIN_ROW_GAP = 140;
-
-            for (let i = 0; i < rows.length - 1; i++) {
-                const currentRow = rows[i];
-                const nextRow = rows[i + 1];
-
-                const currentMaxBottom = currentRow.reduce((maxB, c) => Math.max(maxB, c.pos.y + c.pos.height), -Infinity);
-                const nextMinTop = nextRow.reduce((minT, c) => Math.min(minT, c.pos.y), Infinity);
-
-                const requiredTop = currentMaxBottom + MIN_ROW_GAP;
-                if (nextMinTop < requiredTop) {
-                    const rowDiff = requiredTop - nextMinTop;
-
-                    // Geser semua baris di bawahnya
-                    for (let j = i + 1; j < rows.length; j++) {
-                        rows[j].forEach(c => {
-                            c.pos.y += rowDiff;
-                            const cardEl = document.getElementById('node_' + c.id);
-                            if (cardEl) {
-                                cardEl.style.top = c.pos.y + 'px';
-                            }
-                        });
-                    }
-                }
-            }
         }
 
         /**
